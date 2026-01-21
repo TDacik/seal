@@ -105,6 +105,11 @@ module Catch_exceptions = Self.True (struct
     "Catch and print exceptions in main function (disable for benchmarks)"
 end)
 
+module Int_domain = Self.True (struct
+  let option_name = "-seal-int-domain"
+  let help = "Enable tracking integer values in analysis"
+end)
+
 module Max_int_value = Self.Int (struct
   let option_name = "-seal-max-int"
   let default = 5
