@@ -72,7 +72,7 @@ let assert_eq_state (lhs : state) (rhs : state) : bool =
 
 (* tests for Formula cannot be in the Formula module due to circular dependency *)
 module Tests = struct
-  (* we want the bounds sorted [1+, 2+, 3+, ...] so that during deduplication 
+  (* we want the bounds sorted [1+, 2+, 3+, ...] so that during deduplication
      the lowest possible bound is picked first *)
   let%test "compare_bounds" =
     let input = [ [ mk_ls x y 1 ]; [ mk_ls x y 2 ] ] in
@@ -88,8 +88,8 @@ module Tests = struct
     let src_var = SL.Term.mk_var "src" sort in
     let field_0_var = SL.Term.mk_var "dst_0" SL_builtins.loc_ls in
     let field_1_var = SL.Term.mk_var "dst_1" SL_builtins.loc_dls in
-    let field_0 = MemoryModel0.Field.mk "field_0" SL_builtins.loc_ls in
-    let field_1 = MemoryModel0.Field.mk "field_1" SL_builtins.loc_dls in
+    let field_0 = MemoryModel.Field.mk "field_0" SL_builtins.loc_ls in
+    let field_1 = MemoryModel.Field.mk "field_1" SL_builtins.loc_dls in
     let struct_def =
       MemoryModel.StructDef.mk "struct_name" [ field_0; field_1 ]
     in

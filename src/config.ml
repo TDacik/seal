@@ -1,5 +1,7 @@
 (** This module contains the definitions of the command-line parameters *)
 
+open Astral
+
 module Self = Plugin.Register (struct
   let name = "SEAL Static Analyzer"
   let shortname = "seal"
@@ -35,12 +37,11 @@ module Backend_solver = Self.Enum (struct
   let option_name = "-seal-backend-solver"
   let help = "Which solver should be used by Astral, default: Auto"
 
-  type t = Astral.Options.backend
+  type t = AstralConfig.Backend.t
 
   let default = `Bitwuzla
 
-  let values =
-    [ (`Bitwuzla, "Bitwuzla"); (`CVC5, "CVC5"); (`Z3, "Z3"); (`Auto, "Auto") ]
+  let values = AstralConfig.Backend.values_with_names
 end)
 
 module Astral_mode = Self.Enum (struct
@@ -60,10 +61,10 @@ module Astral_encoding = Self.Enum (struct
   let option_name = "-seal-astral-encoding"
   let help = "Which location encoding should Astral use, default: Bitvectors"
 
-  type t = Astral.Options.encoding
+  type t = AstralConfig.Encoding.t
 
   let default = `Bitvectors
-  let values = [ (`Bitvectors, "Bitvectors"); (`Sets, "Sets") ]
+  let values = AstralConfig.Encoding.values_with_names
 end)
 
 module Print_sort = Self.False (struct

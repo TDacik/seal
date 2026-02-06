@@ -47,11 +47,11 @@ let call (lhs_sort : SL.Sort.t) (func : Cil_types.varinfo)
           let fields =
             Types.get_struct_def lhs_sort |> MemoryModel.StructDef.get_fields
           in
-          let names = List.map MemoryModel0.Field.show fields in
+          let names = List.map MemoryModel.Field.show fields in
           let vars =
             if init_vars_to_null then List.map (fun _ -> Formula.nil) fields
             else
-              List.map MemoryModel0.Field.get_sort fields
+              List.map MemoryModel.Field.get_sort fields
               |> List.map (SL.Variable.mk_fresh (SL.Variable.get_name lhs))
           in
           Formula.PointsTo (lhs, Generic (List.combine names vars))

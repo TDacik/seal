@@ -4,8 +4,8 @@ open Astral
 
 module type CONVERTOR = sig
   val init :
-    backend:Options.backend ->
-    encoding:Options.encoding ->
+    backend:AstralConfig.Backend.t ->
+    encoding:AstralConfig.Encoding.t ->
     dump_queries:[ `None | `Full of string ] ->
     unit ->
     Solver.solver

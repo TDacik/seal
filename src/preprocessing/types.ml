@@ -94,7 +94,7 @@ let rec get_type_info (typ : typ) : Sort.t * MemoryModel.StructDef.t =
                   structure |> get_struct_pointer_fields
                   |> List.map (fun field ->
                          let sort = field.ftype |> get_type_info |> fst in
-                         MemoryModel0.Field.mk field.fname sort)
+                         MemoryModel.Field.mk field.fname sort)
                 in
                 let struct_def = MemoryModel.StructDef.mk name fields in
                 (sort, struct_def))
@@ -108,7 +108,7 @@ let rec get_type_info (typ : typ) : Sort.t * MemoryModel.StructDef.t =
             let sort = Sort.mk_loc name in
             let inner_sort = get_type_info inner |> fst in
             let field =
-              MemoryModel0.Field.mk Constants.ptr_field_name inner_sort
+              MemoryModel.Field.mk Constants.ptr_field_name inner_sort
             in
             let struct_def = MemoryModel.StructDef.mk name [ field ] in
             (sort, struct_def)
