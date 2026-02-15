@@ -99,8 +99,7 @@ let[@warning "-8"] convert f =
               SL_builtins.mk_pto_nls first ~top:t ~next:n;
               SL.mk_predicate "nls" [ t; top; next ];
               SL.mk_predicate "ls" [ n; next ];
-              SL.mk_distinct2 first next;
-              SL.mk_distinct2 t next;
+              SL.mk_distinct [ first; top; t ];
             ]
           (* ) *)
         in

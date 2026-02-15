@@ -312,7 +312,7 @@ let get_targets_of_atom : atom -> var list = function
 let is_spatial_target (target : var) (f : t) : bool =
   f |> get_spatial_atoms
   |> List.exists (fun atom ->
-         get_targets_of_atom atom |> List.exists (fun var -> is_eq target var f))
+      get_targets_of_atom atom |> List.exists (fun var -> is_eq target var f))
 
 let get_spatial_target (src : var) (field : Types.field_type) (f : t) : var =
   get_spatial_atom_from_opt src f |> function
@@ -372,20 +372,29 @@ let pto_to_list : atom -> atom = function
 let add_eq (lhs : var) (rhs : var) (f : t) : t =
   let lhs_class = find_equiv_class lhs f in
   let rhs_class = find_equiv_class rhs f in
+  let has_valid_sort var eq_class =
+    let sort = SL.Variable.get_sort var in
+    List.for_all
+      (fun class_var ->
+        let class_sort = SL.Variable.get_sort class_var in
+        sort = class_sort || class_var = nil)
+      eq_class
+  in
 
   match (lhs_class, rhs_class) with
   (* both variables are already in the same equiv class - do nothing *)
   | Some lhs_class, Some rhs_class when lhs_class = rhs_class -> f
   (* each variable is already in a different equiv class - merge classes *)
-  | Some lhs_class, Some rhs_class ->
+  | Some lhs_class, Some rhs_class
+    when has_valid_sort lhs rhs_class && has_valid_sort rhs lhs_class ->
       f
       |> remove_equiv_class lhs_class
       |> remove_equiv_class rhs_class
       |> add_equiv_class (lhs_class @ rhs_class)
   (* one of the variables is in no existing class - add it to the existing one *)
-  | Some lhs_class, None ->
+  | Some lhs_class, None when has_valid_sort rhs lhs_class ->
       f |> remove_equiv_class lhs_class |> add_equiv_class (rhs :: lhs_class)
-  | None, Some rhs_class ->
+  | None, Some rhs_class when has_valid_sort lhs rhs_class ->
       f |> remove_equiv_class rhs_class |> add_equiv_class (lhs :: rhs_class)
   (* no variable is in an existing class - create a new class *)
   | _ -> f |> add_equiv_class [ lhs; rhs ]
@@ -613,10 +622,10 @@ let canonicalize ?(rename_fresh = true) (f : t) : t =
 
   List.fold_left (fun f var -> make_var_explicit_src var f) f vars
   |> List.map (function
-       | Eq vars -> Eq (List.sort_uniq c vars)
-       | Distinct (lhs, rhs) ->
-           if c lhs rhs > 0 then Distinct (lhs, rhs) else Distinct (rhs, lhs)
-       | atom -> atom)
+    | Eq vars -> Eq (List.sort_uniq c vars)
+    | Distinct (lhs, rhs) ->
+        if c lhs rhs > 0 then Distinct (lhs, rhs) else Distinct (rhs, lhs)
+    | atom -> atom)
   |> List.sort_uniq compare |> standardize_fresh_var_names
 
 let canonicalize_state ?(rename_fresh = true) (state : state) : state =
