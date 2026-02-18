@@ -51,10 +51,10 @@ module Astral_mode = Self.Enum (struct
     "Old == builtin predicate encoding, New == user defined predicates \
      (default)"
 
-  type t = [ `Old | `New ]
+  type t = [ `Old | `New | `New2]
 
-  let default = `New
-  let values = [ (`Old, "old"); (`New, "new") ]
+  let default = `New2
+  let values = [ (`Old, "old"); (`New, "new"); (`New2, "new2") ]
 end)
 
 module Astral_encoding = Self.Enum (struct

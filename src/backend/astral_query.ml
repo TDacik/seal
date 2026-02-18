@@ -34,6 +34,7 @@ let init () =
       match Config.Astral_mode.get () with
       | `Old -> (module Astral_v1)
       | `New -> (module Astral_v2)
+      | `New2 -> (module Astral_v3)
   in
   let module C = (val !convertor) in
   Common.solver := Some (C.init ~dump_queries ~backend ~encoding ())
