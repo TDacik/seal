@@ -312,7 +312,7 @@ let get_targets_of_atom : atom -> var list = function
 let is_spatial_target (target : var) (f : t) : bool =
   f |> get_spatial_atoms
   |> List.exists (fun atom ->
-         get_targets_of_atom atom |> List.exists (fun var -> is_eq target var f))
+      get_targets_of_atom atom |> List.exists (fun var -> is_eq target var f))
 
 let get_spatial_target (src : var) (field : Types.field_type) (f : t) : var =
   get_spatial_atom_from_opt src f |> function
@@ -623,10 +623,10 @@ let canonicalize ?(rename_fresh = true) (f : t) : t =
 
   List.fold_left (fun f var -> make_var_explicit_src var f) f vars
   |> List.map (function
-       | Eq vars -> Eq (List.sort_uniq c vars)
-       | Distinct (lhs, rhs) ->
-           if c lhs rhs > 0 then Distinct (lhs, rhs) else Distinct (rhs, lhs)
-       | atom -> atom)
+    | Eq vars -> Eq (List.sort_uniq c vars)
+    | Distinct (lhs, rhs) ->
+        if c lhs rhs > 0 then Distinct (lhs, rhs) else Distinct (rhs, lhs)
+    | atom -> atom)
   |> List.sort_uniq compare |> standardize_fresh_var_names
 
 let canonicalize_state ?(rename_fresh = true) (state : state) : state =

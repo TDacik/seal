@@ -42,7 +42,10 @@ let call (lhs_sort : SL.Sort.t) (func : Cil_types.varinfo)
       | _ when lhs_sort = SL_builtins.loc_dls ->
           Formula.PointsTo (lhs, DLS_t (fresh_from_lhs (), fresh_from_lhs ()))
       | _ when lhs_sort = SL_builtins.loc_nls ->
-          Formula.PointsTo (lhs, NLS_t (fresh_from_lhs (), fresh_from_lhs ()))
+          Formula.PointsTo
+            ( lhs,
+              NLS_t (fresh_from_lhs (), SL.Variable.mk_fresh "fresh" Sort.loc_ls)
+            )
       | _ ->
           let fields =
             Types.get_struct_def lhs_sort |> MemoryModel.StructDef.get_fields
