@@ -346,7 +346,11 @@ let change_pto_target (src : var) (field : Types.field_type) (new_target : var)
     | Top, NLS_t (_, next) -> NLS_t (new_target, next)
     | Other field, Generic vars ->
         Generic ((field, new_target) :: List.remove_assoc field vars)
-    | _ -> assert false
+    (*| Other field , LS_t _ -> Generic [(field, new_target)]*)
+    | _ ->
+      Format.printf "%s" (match field with Next -> "next" | Prev -> "prev" | Top -> "top" | Other _ -> "other" | Data -> "data");
+      Format.printf "%s" (match old_struct with LS_t _ -> "ls_t" | DLS_t _ -> "dls_t" | NLS_t _ -> "nls_t" | Generic _ -> "gen");
+      assert false
   in
   f |> remove_spatial_from src |> add_atom (PointsTo (src, new_struct))
 
@@ -373,19 +377,25 @@ let add_eq (lhs : var) (rhs : var) (f : t) : t =
   let lhs_class = find_equiv_class lhs f in
   let rhs_class = find_equiv_class rhs f in
 
+  (* Two variables are compatible when they have exactly the same sort.
+     When one of them is nil, we cannot merge their classes. *)
+  let are_compatible =
+    Sort.equal (SL.Variable.get_sort lhs) (SL.Variable.get_sort rhs)
+  in
+
   match (lhs_class, rhs_class) with
   (* both variables are already in the same equiv class - do nothing *)
   | Some lhs_class, Some rhs_class when lhs_class = rhs_class -> f
   (* each variable is already in a different equiv class - merge classes *)
-  | Some lhs_class, Some rhs_class ->
+  | Some lhs_class, Some rhs_class when are_compatible ->
       f
       |> remove_equiv_class lhs_class
       |> remove_equiv_class rhs_class
       |> add_equiv_class (lhs_class @ rhs_class)
   (* one of the variables is in no existing class - add it to the existing one *)
-  | Some lhs_class, None ->
+  | Some lhs_class, None when are_compatible ->
       f |> remove_equiv_class lhs_class |> add_equiv_class (rhs :: lhs_class)
-  | None, Some rhs_class ->
+  | None, Some rhs_class when are_compatible ->
       f |> remove_equiv_class rhs_class |> add_equiv_class (lhs :: rhs_class)
   (* no variable is in an existing class - create a new class *)
   | _ -> f |> add_equiv_class [ lhs; rhs ]
