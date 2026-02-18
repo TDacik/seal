@@ -75,6 +75,7 @@ let type_info : (typ_node, Sort.t * MemoryModel.StructDef.t) Hashtbl.t =
   Hashtbl.create 113
 
 let rec get_type_info (typ : typ) : Sort.t * MemoryModel.StructDef.t =
+  let tt = typ in
   let typ = Ast_types.unroll_deep_node typ in
   Hashtbl.find_opt type_info typ |> function
   | Some result -> result
@@ -104,15 +105,18 @@ let rec get_type_info (typ : typ) : Sort.t * MemoryModel.StructDef.t =
             let struct_def = MemoryModel.StructDef.mk name [] in
             (sort, struct_def)
         | TPtr inner ->
-            let name = Common.get_unique_name "ptr2ptr" in
-            let sort = Sort.mk_loc name in
             let inner_sort = get_type_info inner |> fst in
+            let name = Format.asprintf "ptr2%s" (Sort.show inner_sort) in
+            let sort = Sort.mk_loc name in
             let field =
               MemoryModel.Field.mk Constants.ptr_field_name inner_sort
             in
-            let struct_def = MemoryModel.StructDef.mk name [ field ] in
+            let struct_name = Format.asprintf "%s_wrapper" (Sort.show inner_sort) in
+            let struct_def = MemoryModel.StructDef.mk struct_name ~cons:(struct_name ^ "_c") [ field ] in
             (sort, struct_def)
-        | _ -> (Sort.loc_nil, dummy_struct_def)
+        | TVoid -> (Sort.mk_uninterpreted "void", dummy_struct_def)
+        | TInt kind -> (Sort.int, dummy_struct_def)
+        | t -> (Sort.loc_nil, dummy_struct_def)
       in
       if snd result <> dummy_struct_def then Hashtbl.add type_info typ result;
       result
