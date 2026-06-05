@@ -47,3 +47,10 @@ let unique_counter = ref 0
 let get_unique_name (name : string) : string =
   unique_counter := !unique_counter + 1;
   name ^ "_" ^ string_of_int !unique_counter
+
+let var_unique_name (var : Cil_types.varinfo) : string =
+  let open Cil_types in
+  if var.vglob then var.vname
+  else match Kernel_function.find_defining_kf var with
+    | Some kf -> Format.asprintf "%a#%s" Kernel_function.pretty kf var.vname
+    | None -> assert false

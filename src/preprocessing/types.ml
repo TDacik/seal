@@ -128,14 +128,14 @@ let get_struct_def (sort : Sort.t) : MemoryModel.StructDef.t =
 
 (** Converts the type of a variable into its sort, and creates an SL variable *)
 let varinfo_to_var (varinfo : Cil_types.varinfo) : SL.Variable.t =
-  match varinfo.vname with
-  | name when Ast_types.is_integral varinfo.vtype ->
-      SL.Variable.mk name (Sort.mk_bitvector 32)
-  | _ when not @@ is_relevant_var varinfo ->
-      fail "invalid type in varinfo_to_var: %a" Printer.pp_varinfo varinfo
-  | _ ->
-      let sort = varinfo.vtype |> get_type_info |> fst in
-      SL.Variable.mk varinfo.vname sort
+  let name = Common.var_unique_name varinfo in
+  if Ast_types.is_integral varinfo.vtype then
+    SL.Variable.mk name (Sort.mk_bitvector 32)
+  else if not @@ is_relevant_var varinfo then
+    fail "invalid type in varinfo_to_var: %a" Printer.pp_varinfo varinfo
+  else
+    let sort = varinfo.vtype |> get_type_info |> fst in
+    SL.Variable.mk name sort
 
 (** Memoizes list types inside [get_type_info] *)
 let process_types =
