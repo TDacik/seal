@@ -23,6 +23,7 @@ type atom =
   | LS of ls
   | DLS of dls
   | NLS of nls
+  | Predicate of string * var list
   | IntEq of var * int
   | Ref of var * var
 
@@ -93,6 +94,8 @@ let atom_to_string : atom -> 'a =
   | NLS nls ->
       Format.sprintf "nls_%d+(%s,%s,%s)" nls.min_len (v nls.first) (v nls.top)
         (v nls.next)
+  | Predicate (name, params) ->
+      Format.sprintf "%s(%s)" name (String.concat "," @@ List.map v params)
   | IntEq (var, value) -> Format.sprintf "(%s = %i)" (v var) value
   | Ref (src, target) -> Format.sprintf "ref(%s,%s)" (v src) (v target)
 
@@ -140,6 +143,7 @@ let get_vars (f : t) : var list =
       | LS ls -> [ ls.first; ls.next ]
       | DLS dls -> [ dls.first; dls.last; dls.prev; dls.next ]
       | NLS nls -> [ nls.first; nls.top; nls.next ]
+      | Predicate (_, params) -> params
       | IntEq (var, _) -> [ var ]
       | Ref (src, target) -> [ src; target ])
     f
@@ -179,6 +183,7 @@ let subsitute_in_atom (old_var : var) (new_var : var) : atom -> atom =
           next = v nls.next;
           min_len = nls.min_len;
         }
+  | Predicate (name, params) -> Predicate (name, List.map v params)
   | IntEq (lhs, value) -> IntEq (v lhs, value)
   | Ref (src, target) -> Ref (v src, v target)
 
@@ -238,7 +243,7 @@ let is_eq (lhs : var) (rhs : var) (f : t) : bool =
 (** Spatial atoms *)
 
 let is_spatial_atom : atom -> bool = function
-  | PointsTo _ | LS _ | DLS _ | NLS _ -> true
+  | PointsTo _ | LS _ | DLS _ | NLS _ | Predicate _ -> true
   | _ -> false
 
 let get_spatial_atoms : t -> t = List.filter is_spatial_atom
@@ -248,6 +253,7 @@ let is_spatial_source (src : var) : atom -> bool = function
   | LS ls -> ls.first = src
   | DLS dls -> dls.first = src || dls.last = src
   | NLS nls -> nls.first = src
+  | Predicate (_, x :: _) -> SL.Variable.equal x src (* TODO: make sure that x is always root *)
   | _ -> false
 
 let is_spatial_source_first (src : var) : atom -> bool = function
@@ -255,6 +261,7 @@ let is_spatial_source_first (src : var) : atom -> bool = function
   | LS ls -> ls.first = src
   | DLS dls -> dls.first = src
   | NLS nls -> nls.first = src
+  | Predicate (_, x :: _) -> SL.Variable.equal x src (* TODO: make sure that x is always root *)
   | _ -> false
 
 let make_var_explicit_src (var : var) (f : t) : t =
@@ -307,6 +314,7 @@ let get_targets_of_atom : atom -> var list = function
   | LS ls -> [ ls.next ]
   | DLS dls -> [ dls.prev; dls.next ]
   | NLS nls -> [ nls.top; nls.next ]
+  | Predicate (_, xs) -> xs
   | _ -> assert false
 
 let is_spatial_target (target : var) (f : t) : bool =
