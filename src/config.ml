@@ -121,7 +121,27 @@ module Max_int_value = Self.Int (struct
       default
 end)
 
+module Output_witness = Self.Filepath
+  (struct
+    let option_name = "-seal-witness"
+    let help = "Generate witness"
+    let arg_name = "path"
+    let existence = Frama_c_kernel.Filepath.Indifferent
+    let file_kind = "yml"
+  end)
+
 module Print_version = Self.False (struct
   let option_name = "-seal-version"
   let help = "Print version and exit"
 end)
+
+(** Witness validation *)
+
+module Input_witness = Self.Filepath
+  (struct
+    let option_name = "-seal-validate-witness"
+    let help = "Validate memory safety correctness witness in format 2.2"
+    let arg_name = "path"
+    let existence = Frama_c_kernel.Filepath.Must_exist
+    let file_kind = "yml"
+  end)
