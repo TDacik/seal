@@ -121,6 +121,12 @@ module Max_int_value = Self.Int (struct
       default
 end)
 
+module Check_memcleanup = Self.True (struct
+  let option_name = "-seal-memcleanup"
+  let help = "Report memory leaks for blocks that remain reachable but are not explicitly freed when \
+              program terminates."
+end)
+
 module Output_witness = Self.Filepath
   (struct
     let option_name = "-seal-witness"

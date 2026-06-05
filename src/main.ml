@@ -8,6 +8,20 @@ open Common
 
 module ForwardsAnalysis = Forwards (Analysis)
 
+(** Check if there are any allocations left after the main function *)
+let check_memcleanup main =
+  let return_stmt = Kernel_function.find_return main in
+  let final_state =
+    Hashtbl.find !Func_call.function_context.results return_stmt
+  in
+  List.iter
+    (fun formula ->
+      Formula.get_spatial_atoms formula |> function
+        (* TODO: should raise Memcleanup instead *)
+      | atom :: _ -> Formula.report_bug (Invalid_memtrack (atom, formula))
+      | _ -> ())
+    final_state
+
 let run_analysis () =
   Func_call.compute_function := ForwardsAnalysis.compute;
 
@@ -26,17 +40,7 @@ let run_analysis () =
   (* run the dataflow analysis *)
   ForwardsAnalysis.compute [ first_stmt ];
 
-  (* check if there are any allocations left after the main function *)
-  let return_stmt = Kernel_function.find_return main in
-  let final_state =
-    Hashtbl.find !Func_call.function_context.results return_stmt
-  in
-  List.iter
-    (fun formula ->
-      Formula.get_spatial_atoms formula |> function
-      | atom :: _ -> Formula.report_bug (Invalid_memtrack (atom, formula))
-      | _ -> ())
-    final_state;
+  if Config.Check_memcleanup.get () then check_memcleanup main else ()
 
   Self.result "Successful_verification"
 
