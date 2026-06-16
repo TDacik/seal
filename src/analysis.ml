@@ -135,6 +135,8 @@ let doGuard _ (condition : exp) (state : t) : t guardaction * t guardaction =
   let th = List.filter Astral_query.check_sat th in
   let el = List.filter Astral_query.check_sat el in
 
+  if List.is_empty th && List.is_empty el then failwith "Both branches dead" else ();
+
   Self.debug ~current:true ~dkey:Printing.do_guard
     "state:\n%athen branch:\n%aelse branch:\n%a" Formula.pp_state state
     Formula.pp_state th Formula.pp_state el;
