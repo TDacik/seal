@@ -185,4 +185,8 @@ let call (lhs_sort : SL.Sort.t) (func : Cil_types.varinfo)
           raise @@ Formula.Bug (Invalid_free (var, formula), pos)
       | e -> raise e)
   | "__VERIFIER_nondet_int", _ -> ([ formula ], [ Formula.nondet ])
+  | "__VERIFIER_print_state", _ ->
+      Config.Self.result ~current:true "%a" Formula.pp_formula formula;
+      ([formula], [Formula.nil])
+
   | _, args -> Func_call.func_call args func formula lhs_sort
