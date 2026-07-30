@@ -54,3 +54,7 @@ let var_unique_name (var : Cil_types.varinfo) : string =
   else match Kernel_function.find_defining_kf var with
     | Some kf -> Format.asprintf "%a#%s" Kernel_function.pretty kf var.vname
     | None -> assert false
+
+let stmt_line stmt =
+  let loc = Cil_datatype.Stmt.loc stmt in
+  (fst loc).pos_lnum
