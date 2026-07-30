@@ -195,21 +195,23 @@ let doStmt_validator (stmt : stmt) (state : t) : t stmtaction =
     try (Hashtbl.find !Func_call.function_context.loop_cycles stmt) == 0
     with Not_found -> true
   in
-  let line = Common.stmt_line stmt in
-  let invariant =
-    match GlobalWitness.get_loop_invariant stmt with
-    | None -> raise @@ Exceptions.MissingInvariant line
-    | Some invariant -> invariant
-  in
   match stmt.skind with
-  | Loop _ when is_first_iteration stmt ->
-    Self.debug "Checking invariant %s" (Astral.SL.show invariant.content);
-    if Astral_query.check_entailment' state invariant.content then
-      let _ = Self.debug "Invariant for line %d holds on entry" line in
-      SUse (Astral2Seal.convert invariant.content)
-    else raise @@ Exceptions.NotInvariant (state, invariant)
-  (* Fixpoint wasn't reached using user-provided invariant *)
-  | Loop _ -> raise @@ Exceptions.NotInductive invariant
+  | Loop _ ->
+    let line = Common.stmt_line stmt in
+    let invariant =
+      match GlobalWitness.get_loop_invariant stmt with
+      | None -> raise @@ Exceptions.MissingInvariant line
+      | Some invariant -> invariant
+    in
+    if is_first_iteration stmt then (
+      Self.debug "Checking invariant %s" (Astral.SL.show invariant.content);
+      if Astral_query.check_entailment' state invariant.content then
+        let _ = Self.debug "Invariant for line %d holds on entry" line in
+        SUse (Astral2Seal.convert invariant.content)
+      else raise @@ Exceptions.NotInvariant (state, invariant)
+    )
+    (* Fixpoint wasn't reached using user-provided invariant *)
+    else raise @@ Exceptions.NotInductive invariant
   | _ -> SDefault
 
 let doStmt (stmt : stmt) (state : t) : t stmtaction =
