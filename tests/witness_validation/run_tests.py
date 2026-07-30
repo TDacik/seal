@@ -86,7 +86,8 @@ class TestCase:
             "-seal-validate-witness", self.witness_path,
             self.source_path]
         # fmt: on
-        print_debug(" ".join(command))
+        if debug:
+            print_debug(" ".join(command))
 
         def read_verdict(stdout):
             res = stdout.lower()
