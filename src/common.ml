@@ -10,14 +10,21 @@ let solver : Solver.solver option ref = ref None
 let fail message = Self.fatal ~current:true message
 let warning message = Self.warning ~current:true message
 let debug message = Self.warning ~current:true message
+let unsupported message = Self.not_yet_implemented ~current:true message
 
 let mk_fresh_var_from (base : SL.Variable.t) : SL.Variable.t =
-  if base = SL.Variable.nil then SL.Variable.nil
+  if SL.Variable.is_nil base then SL.Variable.nil
   else
     SL.Variable.mk_fresh (SL.Variable.get_name base) (SL.Variable.get_sort base)
 
 let is_fresh_var (var : SL.Variable.t) : bool =
   String.contains (SL.Variable.get_name var) '!'
+
+let is_nondet_var (var : SL.Variable.t) : bool =
+  String.starts_with (SL.Variable.get_name var) ~prefix:"_nondet"
+
+let is_anchor_var (var : SL.Variable.t) : bool =
+  String.contains (SL.Variable.get_name var) '$'
 
 let list_count (elem : 'a) (list : 'a List.t) : int =
   list |> List.filter (( = ) elem) |> List.length
@@ -58,3 +65,20 @@ let var_unique_name (var : Cil_types.varinfo) : string =
 let stmt_line stmt =
   let loc = Cil_datatype.Stmt.loc stmt in
   (fst loc).pos_lnum
+
+let pretty_stmt_loc fmt stmt =
+  let open Cil_types in
+  let open Cil_datatype in
+  let stmt_short = match stmt.skind with
+    | If _ -> "if"
+    | Switch _ -> "switch"
+    | Loop _ -> "loop"
+    | Block _ -> "block"
+    | UnspecifiedSequence _ -> "unspec-seq"
+    | _ -> Format.asprintf "%a" Stmt.pretty stmt
+  in
+  Format.fprintf fmt "%d:%s" (stmt_line stmt) stmt_short
+
+let is_loop stmt =
+  let open Cil_types in
+  match stmt.skind with Loop _ -> true | _ -> false

@@ -195,7 +195,7 @@ let doStmt_validator (stmt : stmt) (state : t) : t stmtaction =
     try (Hashtbl.find !Func_call.function_context.loop_cycles stmt) == 0
     with Not_found -> true
   in
-  let line = Utils.stmt_line stmt in
+  let line = Common.stmt_line stmt in
   let invariant =
     match GlobalWitness.get_loop_invariant stmt with
     | None -> raise @@ Exceptions.MissingInvariant line
