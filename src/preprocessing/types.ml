@@ -108,7 +108,7 @@ let c_field_to_astral field =
   let name = field.fname in
   let sort = match (Ast_types.unroll field.ftype).tnode with
   | TVoid -> Common.unsupported "void pointer"
-  | TInt _ -> Common.unsupported "int field"
+  | TInt _ -> Sort.mk_loc "int"
   | TFloat _ -> Common.unsupported "float pointer"
   | TArray _ -> Common.unsupported "array pointer"
   | TFun _ -> Common.unsupported "function pointer"
