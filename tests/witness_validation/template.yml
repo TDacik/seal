@@ -1,0 +1,53 @@
+- entry_type: predicate_definition_set
+  metadata:
+    format_version: "2.2"
+    uuid: $UUID
+    creation_time: $TIME
+    producer:
+      name: Crafted
+      version: "0.1"
+    task:
+      input_files:
+      - $PATH
+      input_file_hashes:
+        $PATH: $HASH
+      specification: G valid-free && G valid-deref && G valid-memtrack
+      data_model: $DATA_MODEL
+      language: C
+  content:
+  - predicate_definition:
+      name: pred
+      parameters:
+      - name: start
+        type: struct pred *
+      - name: end
+        type: struct pred *
+      definition: ...
+      format: ext_c_expression
+      location:
+        file_name: $PATH
+        line: __
+- entry_type: invariant_set
+  metadata:
+    format_version: "2.2"
+    uuid: $UUID
+    creation_time: $TIME
+    producer:
+      name: Crafted
+      version: "0.1"
+    task:
+      input_files:
+      - $PATH
+      input_file_hashes:
+        $PATH: $HASH
+      specification: G valid-free && G valid-deref && G valid-memtrack
+      data_model: $DATA_MODEL
+      language: C
+  content:
+  - invariant:
+      type: loop_memory_invariant
+      location:
+        file_name: $PATH
+        line: __
+      value: __
+      format: ext_c_expression
