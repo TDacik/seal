@@ -16,9 +16,12 @@ let find_kf_by_line line : Kernel_function.t option =
     | _ -> acc
   ) None
 
-let find_varinfo_by_name (loc : int) name =
-  let kf = find_kf_by_line loc in
+let find_varinfo_by_name scope name =
+  let kf = match scope with
+    | `Location loc -> find_kf_by_line loc
+    | `Function kf -> Some kf
+    | `None -> None
+  in
   match kf with
-  | Some kf ->
-    Globals.Syntactic_search.find_in_scope ~strict:false name (Whole_function kf)
-  | None -> None
+  | Some kf -> Globals.Syntactic_search.find_in_scope ~strict:false name (Whole_function kf)
+  | None -> Globals.Syntactic_search.find_in_scope ~strict:false name Global

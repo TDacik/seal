@@ -16,7 +16,7 @@ let formula_to_c_exp str =
   let str = unescape str in
   let str = BatString.nreplace ~str ~sub:"\\canAccess" ~by:"canAccess" in
   let str = BatString.nreplace ~str ~sub:"\\at" ~by:"at" in
-  let str = BatString.nreplace ~str ~sub:"&*&" ~by:"&&" in
+  let str = BatString.nreplace ~str ~sub:"\\separated" ~by:"separated" in
   str
 
 let declare_body body =

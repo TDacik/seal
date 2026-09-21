@@ -33,7 +33,7 @@ let convert_var ?(prefix="") name =
   (** Each variable in invariant must come from the original C program and
       thus we should be able to locate it somewhere. *)
   let open Cil_types in
-  let var = WitnessUtils.find_varinfo_by_name !location name in
+  let var = WitnessUtils.find_varinfo_by_name (`Location !location) name in
   match var with
     | Some var ->
       let sort, _ = Types.get_type_info var.vtype in
@@ -68,35 +68,45 @@ let rec convert_term e = match e.expr_node with
     if expr_name_equal "Pre" where then convert_var ~prefix:"A$" (exp_to_string what)
     else failwith "todo: at"
 
-  | CALL _ -> failwith "call"
+  | CALL _ -> failwith "unknown call"
 
   | _ -> failwith @@ Format.asprintf "Unknown term: %a" Cprint.print_expression e
 
 let rec convert e = match e.expr_node with
   | BINARY (EQ, e1, e2) -> SL.mk_eq @@ List.map convert_term [e1; e2]
   | BINARY (NE, e1, e2) -> SL.mk_distinct @@ List.map convert_term [e1; e2]
-  | BINARY (AND, e1, e2) -> SL.mk_star @@ List.map convert [e1; e2]
+  | BINARY (AND, e1, e2) -> SL.mk_and @@ List.map convert [e1; e2]
   | BINARY (OR, e1, e2) -> SL.mk_or @@ List.map convert [e1; e2]
 
   | CALL (exp, [base; size], _) when expr_name_equal "canAccess" exp ->
     let base = convert_term base in
-    let sort = SL.Term.get_sort base in
-    let cons = Types.get_struct_def sort in
-    let fields = StructDef.get_fields cons in
-    let rhs = List.map (fun f -> SL.Term.mk_fresh_var "e" @@ Field.get_sort f) fields in
-    SL.mk_pto_struct base cons rhs
+    (match SL.Term.view base with
+    | Var _ -> failwith "TODO"
+    | HeapTerm (f, source) ->
+      (* TODO: check access exists for other fields *)
+      let sort = SL.Term.get_sort base in
+      let cons = Types.get_struct_def sort in
+      let fields = StructDef.get_fields cons in
+      let rhs = List.map (fun f -> SL.Term.mk_fresh_var "e" @@ Field.get_sort f) fields in
+      SL.mk_pto_struct source cons rhs
+    | _ -> assert false)
 
+  | CALL (exp, xs, _) when expr_name_equal "separated" exp ->
+    SL.mk_star @@ List.map convert xs
+
+  (* TODO: check if is defined predicate! *)
   | CALL (exp, params, _) ->
     (* Inductive predicate *)
     let name = exp_to_string exp in
     SL.mk_predicate name @@ List.map convert_term params
+
   | UNARY _ -> failwith "unary"
   | BINARY _ -> failwith "binary"
   | CAST _ -> failwith "cast"
   | PAREN e -> convert e
   | MEMBEROF _ -> failwith "memberof"
   | MEMBEROFPTR _ -> failwith "memberof_ptr"
-  | _ -> assert false
+  | _ -> failwith @@ (Format.asprintf "%a" Cabs_debug.pp_exp e)
 
 let get_formula = function
   | RETURN (exp, _) -> convert exp
@@ -109,10 +119,13 @@ let map_cases fn phi = match SL.view phi with
   | Or psis -> SL.mk_or @@ List.map fn psis
   | _ -> fn phi
 
+let to_precise_hack = SL.map_view (function And xs -> `Modify (SL.mk_star xs) | _ -> `Skip)
+
 let fn phi : SL.t =
   let vars = SL.free_vars phi in
   let existentials = List.filter is_existential vars in
   SL.mk_exists existentials phi
+  |> to_precise_hack
   |> HeapTermElimination.apply
   (*|> QuantifierElimination.remove_determined*)
 

@@ -67,9 +67,18 @@ let get_location yaml =
 
 let sort_of_c_type str =
   let open Logic_typing in
-  (* TODO: what to do with typedefs? *)
-  let name = String.split_on_char ' ' str |> List.hd in
-  let ctype = Globals.Types.find_type Struct name in
+  (* TODO: non pointers *)
+  assert (String.ends_with ~suffix:"*" str);
+  (* TODO: typedefs proper handling *)
+  let ctype =
+    if String.starts_with ~prefix:"struct " str then
+      let name = String.split_on_char ' ' str |> List.tl |> List.hd in
+      Config.Self.result "Looking for %s" name;
+      Globals.Types.find_type Struct name
+    else
+      let name = String.split_on_char ' ' str |> List.hd in
+      Globals.Types.find_type Typedef name
+  in
   Types.sort_of_type @@ Cil_const.mk_tptr ctype
 
 let parse_definition = ()
@@ -78,7 +87,7 @@ let parse_definition = ()
 (** *)
 
 let find_struct name =
-  let name = List.nth (String.split_on_char ' ' name) 0 in
+  let name = List.nth (String.split_on_char ' ' name) 1 in
   try Globals.Types.find_type Logic_typing.Struct name
   with _ -> failwith ("No structure: " ^ name)
 
@@ -105,9 +114,9 @@ let parse_definition params body =
   ExprParser.parse params body
 
 let parse_predicate = function
-  | `O ["predicate", decl] ->
+  | `O ["predicate_definition", decl] ->
     let name = find_string "name" decl in
-    let types, params = parse_params @@ find "params" decl in
+    let types, params = parse_params @@ find "parameters" decl in
     let definition = parse_definition 0 (* TODO! *) name types params @@ find_string "definition" decl in
     InductiveDefinition.mk name params definition
   | `O _ -> failwith "TODO"
@@ -122,7 +131,7 @@ let parse_logic_declarations yaml = match yaml with
     let content = Option.get @@ Yaml.Util.find_exn "content" yaml in
     parse_predicates content
 
-  | _ -> failwith "Expecting object `logic_declarations`"
+  | _ -> failwith "Expecting object `predicate_definition_set`"
 
 (** {2 Parsing of invariants} *)
 
@@ -151,11 +160,11 @@ let parse_invariant_set yaml = match yaml with
   | `O _ ->
     let content = Option.get @@ Yaml.Util.find_exn "content" yaml in
     parse_invariants content
-  | _ -> failwith "Expecting object `logic_declarations`"
+  | _ -> failwith "Expecting object `invariant_set`"
 
 let parse_yaml = function
   | `A entries ->
-    let predicates = find_entry ~default:(`O ["content", `A []]) "logic_declarations" entries in
+    let predicates = find_entry ~default:(`O ["content", `A []]) "predicate_definition_set" entries in
     let invariants = find_entry ~default:(`O []) "invariant_set" entries in
     {
       predicates = parse_logic_declarations predicates;
