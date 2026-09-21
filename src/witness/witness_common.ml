@@ -7,9 +7,9 @@ let current_time () =
     (time.tm_mon + 1) (* months 0..11 *)
     time.tm_mday time.tm_hour time.tm_min time.tm_sec
 
-let get_uuid () =
-  Uuidm.v4_gen (Random.get_state ()) ()
-  |> Uuidm.to_string
+let get_uuid =
+  let state = Random.State.make_self_init () in
+  fun () -> Uuidm.v4_gen state () |> Uuidm.to_string
 
 let get_data_model () =
   match Machine.sizeof_ptr () with
