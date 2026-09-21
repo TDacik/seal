@@ -3,9 +3,12 @@ open Astral
 
 let parse_file filename =
   let lexbuf, lexer = Clexer.init ~filename Clexer.initial in
-  let cabs = Cparser.file lexer lexbuf in
-  Clexer.finish ();
-  cabs
+  try
+    let cabs = Cparser.file lexer lexbuf in
+    let _ = Clexer.finish () in
+    cabs
+  with _ ->
+    raise @@ Exceptions.SyntaxError
 
 let formula_to_c_exp str =
   let unescape str =

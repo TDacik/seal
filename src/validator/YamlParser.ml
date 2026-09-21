@@ -6,6 +6,8 @@ open Cil_datatype
 
 open CorrectnessWitness
 
+let path_ref = ref ""
+
 let fail msg =
   Format.printf "%s" msg;
   exit 1
@@ -60,8 +62,15 @@ let find_entry ?default entry_type entries =
 (** High-level get functions *)
 
 let get_location yaml =
-  find "location" yaml
-  |> find_int "line"
+  let loc = find "location" yaml in
+  let prefix = Filepath.dirname (Filepath.of_string !path_ref) in
+  let file =
+    find_string "file_name" loc
+    |> Filepath.concat ~existence:Must_exist prefix
+    |> Filepath.to_string
+  in
+  let line = find_int "line" loc in
+  (file, line)
 
 (** *)
 
@@ -110,14 +119,11 @@ let parse_params = function
     types, params
   | _ -> failwith "TODO"
 
-let parse_definition params body =
-  ExprParser.parse params body
-
 let parse_predicate = function
   | `O ["predicate_definition", decl] ->
     let name = find_string "name" decl in
     let types, params = parse_params @@ find "parameters" decl in
-    let definition = parse_definition 0 (* TODO! *) name types params @@ find_string "definition" decl in
+    let definition = ExprParser.parse ("none", 0) (* TODO! *) name types params @@ find_string "definition" decl in
     InductiveDefinition.mk name params definition
   | `O _ -> failwith "TODO"
   | _ -> failwith "Expecting object in declaration"
@@ -137,14 +143,14 @@ let parse_logic_declarations yaml = match yaml with
 
 let parse_invariant = function
   | `O [_, invariant] ->
-    let line = get_location invariant in
+    let file, line = get_location invariant in
     let value = find_string "value" invariant in
     let labels = find_list ~empty_default:true (get_string) "labels" invariant in
     let invariant = Invariant.{
       location = line;
       raw_content = value;
       should_be_inductive = List.mem "inductive" labels;
-      content = ExprParser.parse line "invariant" [] [] value;
+      content = ExprParser.parse (file, line) "invariant" [] [] value;
     }
     in
     (line, invariant)
@@ -173,6 +179,7 @@ let parse_yaml = function
   | _ -> failwith "Toplevel error"
 
 let parse path =
+  path_ref := path;
   let module IC = In_channel in
   let text = IC.with_open_text path IC.input_all in
   match Yaml.of_string text with

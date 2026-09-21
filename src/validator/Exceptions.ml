@@ -1,5 +1,7 @@
 open CorrectnessWitness
 
+exception SyntaxError
+
 exception MissingInvariant of int
 
 exception UnknownVariable of RawInvariant.t * string

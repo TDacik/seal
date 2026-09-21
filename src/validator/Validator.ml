@@ -33,9 +33,10 @@ let validate witness_path =
       Self.debug  "State is: %a" Formula.pp_state state;
       Self.result "%s" unknown
     | Exceptions.UnknownVariable (invariant, name) ->
-      Self.result "Error when parsing invariant for line %d: %s" invariant.location invariant.raw_content;
-      Self.result "  Variable %s does not exist in the current context" name;
-      Self.result "%s" error
+      Self.abort "Error when parsing invariant for line %d: %s: Variable %s does not exist in the current context"
+        invariant.location invariant.raw_content name
+    | Exceptions.SyntaxError ->
+      Self.abort "Syntax error when parsing witness"
     | Formula.Bug (bug_type, pos) ->
       (* TODO: When can we reject? *)
       Self.result ~source:pos "%a" Formula.pp_bug_type bug_type;

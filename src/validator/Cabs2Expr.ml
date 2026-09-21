@@ -11,7 +11,7 @@ open Cil_datatype
 (* Global context *)
 
 let params = ref []
-let location = ref (-1)
+let location = ref ("", -1)
 let invariant = ref None
 
 (** Utilities *)
@@ -81,7 +81,14 @@ let rec convert e = match e.expr_node with
   | CALL (exp, [base; size], _) when expr_name_equal "canAccess" exp ->
     let base = convert_term base in
     (match SL.Term.view base with
-    | Var _ -> failwith "TODO"
+    | Var v ->
+      (* TODO: check that accesses cover whole var *)
+      let sort = SL.Variable.get_sort v in
+      let cons = Types.get_struct_def sort in
+      let fields = StructDef.get_fields cons in
+      let rhs = List.map (fun f -> SL.Term.mk_fresh_var "e" @@ Field.get_sort f) fields in
+      SL.mk_pto_struct (SL.Term.of_var v) cons rhs
+
     | HeapTerm (f, source) ->
       (* TODO: check access exists for other fields *)
       let sort = SL.Term.get_sort base in
@@ -133,7 +140,7 @@ let get pos body ps cabs =
   let open CorrectnessWitness in
   params := ps;
   location := pos;
-  invariant := Some RawInvariant.{location = pos; raw_content = body; should_be_inductive = false (* not relevant *)};
+  invariant := Some RawInvariant.{location = snd pos; raw_content = body; should_be_inductive = false (* not relevant *)};
   List.find_map (function
     | FUNDEF (_, name, block, _, _) when name_equal "main" name ->
       let phi = get_formula @@ (List.hd block.bstmts).stmt_node in

@@ -11,11 +11,12 @@ let convert_target c ys =
   Formula.Generic (List.mapi f ys)
 
 let convert_atom phi = match SL.view phi with
+  | Emp -> Formula.Eq [Formula.nil; Formula.nil]
   | Eq xs -> Formula.Eq (List.map convert_term xs)
   | Distinct [x1; x2] -> Formula.Distinct (convert_term x1, convert_term x2)
   | PointsTo (x, c, ys) -> Formula.PointsTo (convert_term x, convert_target c ys)
   | Predicate (name, ys, 0, _) -> Formula.Predicate (name, List.map convert_term ys)
-  | _ -> failwith ("TODO" ^ SL.show phi)
+  | _ -> failwith ("TODO " ^ SL.show phi)
 
 let rec convert_sh phi = match SL.view phi with
   | Emp -> []
