@@ -1,0 +1,37 @@
+# Expected: valid
+# Description: empty predicate definition set
+
+- entry_type: predicate_definition_set
+  metadata:
+    format_version: "2.2"
+    uuid: 50ba8dc7-e064-4455-8f2c-b6bdaa557fd1
+    creation_time: 2026-09-21T14:54:09Z
+    producer:
+      name: Crafted
+      version: "0.1"
+    task:
+      input_files:
+      - ./empty_prog.c
+      input_file_hashes:
+        ./empty_prog.c: 89368ca7b977ca12d41c1e01bfd04a716268de28ee89058c28f46405882dc789
+      specification: G valid-free && G valid-deref && G valid-memtrack
+      data_model: ILP32
+      language: C
+  content: []
+- entry_type: invariant_set
+  metadata:
+    format_version: "2.2"
+    uuid: c00d61dd-dc40-4f01-95e5-37763933cca3
+    creation_time: 2026-09-21T14:54:09Z
+    producer:
+      name: Crafted
+      version: "0.1"
+    task:
+      input_files:
+      - ./empty_prog.c
+      input_file_hashes:
+        ./empty_prog.c: 89368ca7b977ca12d41c1e01bfd04a716268de28ee89058c28f46405882dc789
+      specification: G valid-free && G valid-deref && G valid-memtrack
+      data_model: ILP32
+      language: C
+  content: []

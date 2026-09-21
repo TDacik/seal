@@ -1,0 +1,20 @@
+# Expected: valid
+# Description: no predicate definition set
+
+- entry_type: invariant_set
+  metadata:
+    format_version: "2.2"
+    uuid: eb348a91-b123-40e6-a319-715a1ddedc48
+    creation_time: 2026-09-21T14:52:36Z
+    producer:
+      name: Crafted
+      version: "0.1"
+    task:
+      input_files:
+      - ./empty_prog.c
+      input_file_hashes:
+        ./empty_prog.c: 89368ca7b977ca12d41c1e01bfd04a716268de28ee89058c28f46405882dc789
+      specification: G valid-free && G valid-deref && G valid-memtrack
+      data_model: ILP32
+      language: C
+  content: []
