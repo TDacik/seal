@@ -165,7 +165,7 @@ let check_entailment' (lhs : Formula.state) (astral_rhs : SL.t) : bool =
     List.for_all (fun f -> check_invariant_aux f astral_rhs) lhs
   | Or psis when List.for_all SL.is_symbolic_heap psis ->
     List.for_all (fun l ->
-      List.for_all (fun r ->
+      List.exists (fun r ->
         check_invariant_aux l r
       ) psis
     ) lhs
