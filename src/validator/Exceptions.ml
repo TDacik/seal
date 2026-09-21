@@ -1,6 +1,6 @@
 open CorrectnessWitness
 
-exception SyntaxError
+exception SyntaxError of string
 
 exception MissingInvariant of int
 

@@ -12,6 +12,11 @@ let fail msg =
   Format.printf "%s" msg;
   exit 1
 
+let yaml_to_string yaml =
+  match Yaml.to_string yaml with
+  | Ok str -> str
+  | Error (`Msg msg) -> Format.sprintf "<error> (%s)" msg
+
 let get_string = function
   | `String str -> str
   | _ -> fail "expecting string"
@@ -20,8 +25,8 @@ let find ?default key yaml_object =
   match Yaml.Util.find key yaml_object, default with
   | Ok (Some res), _ -> res
   | Ok None, Some default -> default
-  | Ok None, None -> fail @@ Format.asprintf "Key '%s' is missing in:\n %s" key (Yaml.to_string_exn yaml_object)
-  | Error (`Msg msg), _ -> fail msg
+  | Ok None, None -> fail @@ Format.asprintf "Key '%s' is missing in:\n %s" key (yaml_to_string yaml_object)
+  | Error (`Msg msg), _ -> failwith ("Yaml parser error: " ^ msg)
 
 let find_string ?default key yaml_object =
   let default = Option.map (fun b -> `String b) default in
@@ -66,7 +71,7 @@ let get_location yaml =
   let prefix = Filepath.dirname (Filepath.of_string !path_ref) in
   let file =
     find_string "file_name" loc
-    |> Filepath.concat ~existence:Must_exist prefix
+    |> Filepath.concat prefix
     |> Filepath.to_string
   in
   let line = find_int "line" loc in
@@ -133,10 +138,13 @@ let parse_predicates = function
   | _ -> failwith "Expecting list of declarations in `content`"
 
 let parse_logic_declarations yaml = match yaml with
+  | `O [] -> []
   | `O _ ->
-    let content = Option.get @@ Yaml.Util.find_exn "content" yaml in
-    parse_predicates content
-
+    begin match Yaml.Util.find "content" yaml with
+    | Ok (Some content) -> parse_predicates content
+    | Ok (None) -> failwith "Missing content of predicate_definition_set"
+    | Error (`Msg msg) -> failwith ("Yaml parser error: " ^ msg)
+    end
   | _ -> failwith "Expecting object `predicate_definition_set`"
 
 (** {2 Parsing of invariants} *)
@@ -164,13 +172,16 @@ let parse_invariants = function
 
 let parse_invariant_set yaml = match yaml with
   | `O _ ->
-    let content = Option.get @@ Yaml.Util.find_exn "content" yaml in
-    parse_invariants content
+    begin match Yaml.Util.find "content" yaml with
+    | Ok (Some content) -> parse_invariants content
+    | Ok (None) -> failwith "Missing content invariant_set"
+    | Error (`Msg msg) -> failwith ("Yaml parser error: " ^ msg)
+    end
   | _ -> failwith "Expecting object `invariant_set`"
 
 let parse_yaml = function
   | `A entries ->
-    let predicates = find_entry ~default:(`O ["content", `A []]) "predicate_definition_set" entries in
+    let predicates = find_entry ~default:(`O []) "predicate_definition_set" entries in
     let invariants = find_entry ~default:(`O []) "invariant_set" entries in
     {
       predicates = parse_logic_declarations predicates;
@@ -184,4 +195,4 @@ let parse path =
   let text = IC.with_open_text path IC.input_all in
   match Yaml.of_string text with
     | Ok yaml -> parse_yaml yaml
-    | Error (`Msg msg) -> failwith msg
+    | Error (`Msg msg) -> failwith ("Yaml parser error: " ^ msg)

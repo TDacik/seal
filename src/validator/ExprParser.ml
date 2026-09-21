@@ -8,7 +8,8 @@ let parse_file filename =
     let _ = Clexer.finish () in
     cabs
   with _ ->
-    raise @@ Exceptions.SyntaxError
+    let content = In_channel.(with_open_text filename input_all) in
+    raise @@ Exceptions.SyntaxError content
 
 let formula_to_c_exp str =
   let unescape str =

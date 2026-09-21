@@ -24,6 +24,7 @@ let compute_region_size var field =
 
 let convert_var v =
   let full_name = SL.Variable.show v in
+  assert (not @@ String.contains_from full_name 0 '!');
   match String.split_on_char '#' full_name with
   | _ when SL.Variable.is_nil v -> "NULL"
   | [prefix; name] ->
@@ -59,16 +60,30 @@ let rec pure_atom = function
   | LS {first; next; min_len=1} -> Some (F.sprintf "%s != %s" (convert_var first) (convert_var next))
   | LS {first; next; min_len=2} -> Some (F.sprintf "%s != %s" (convert_var first) (convert_var next)) (* TODO *)
 
+  | Ref (source, target) -> Some (F.sprintf "*%s == %s" (convert_var source) (convert_var target))
+
   | Freed _ | Predicate _ | DLS _ | NLS _  -> None
   | _ -> assert false
 
 (* TODO: will not work with multiple types of lists *)
 (* TODO: bounds *)
-let spatial_atom = function
+let spatial_atom f = function
   | Predicate (name, xs) -> failwith "TODO"
   | LS {first; next; _} ->
     Some (F.sprintf "ls_sll(%s, %s)" (convert_var first) (convert_var next))
-  | DLS {first; last; prev; next; _} -> Some (Format.sprintf "dls_dll(%s, %s, %s, %s)" (convert_var first) (convert_var next) (convert_var last) (convert_var prev))
+  (* DLS with unused last allocated node *)
+  | DLS {first; last; prev; next; _} when Astral_v2.is_unconstrained last f  ->
+    Some (
+      Format.sprintf "dls_dll_simple(%s, %s, %s)"
+        (convert_var first) (convert_var next)
+        (convert_var prev)
+    )
+  | DLS {first; last; prev; next; _} ->
+      Some (
+        Format.sprintf "dls_dll(%s, %s, %s, %s)"
+          (convert_var first) (convert_var next)
+          (convert_var last) (convert_var prev)
+      )
   | NLS {first; top; next; _} -> Some (Format.sprintf "nls_todo(%s, %s, %s)" (convert_var first) (convert_var top) (convert_var next))
   | _ -> None
 (*
@@ -83,6 +98,8 @@ let perms_atom = function
     |> List.map (fun (field, y) -> F.sprintf "\\canAccess(%s->%s, %d)" (convert_var x) field (Machine.sizeof_ptr ()))
     |> String.concat ", "
     |> Option.some
+  | Ref (source, _) ->
+    Some (F.sprintf "\\canAccess(%s)" (convert_var source))
   | _ -> None
 
 let preprocess =
@@ -99,11 +116,14 @@ let preprocess =
 
 let convert f =
   let f = preprocess f in
-  let close str = "(" ^ str ^ ")" in
-  let pure_part = String.concat " && " @@ List.filter_map pure_atom f in
-  let spatial_part = List.filter_map spatial_atom f in
+  let pure_part = List.filter_map pure_atom f in
+  let spatial_part = List.filter_map (spatial_atom f) f in
   let permissions = List.filter_map perms_atom f in
-  match permissions @ spatial_part with
-  | []  -> F.sprintf "%s" pure_part
-  | [p] -> F.sprintf "%s && %s" p pure_part
-  | ps -> F.sprintf "\\separated(%s) && (%s)" (String.concat ", " @@ ps) pure_part
+  match permissions @ spatial_part, pure_part with
+  | [], [] -> assert false
+  | [], pure -> String.concat " && " pure
+  | spatial, [] -> F.sprintf "\\separated(%s)" (String.concat ", " spatial)
+  | s, p ->
+      assert (s <> []);
+      assert (p <> []);
+      F.sprintf "\\separated(%s) && (%s)" (String.concat ", " s) (String.concat " && " p)

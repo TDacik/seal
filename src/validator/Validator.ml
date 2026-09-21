@@ -35,8 +35,9 @@ let validate witness_path =
     | Exceptions.UnknownVariable (invariant, name) ->
       Self.abort "Error when parsing invariant for line %d: %s: Variable %s does not exist in the current context"
         invariant.location invariant.raw_content name
-    | Exceptions.SyntaxError ->
-      Self.abort "Syntax error when parsing witness"
+    | Exceptions.SyntaxError expr ->
+      Self.debug "Expression: %s" expr;
+      Self.abort "Syntax error when parsing expression"
     | Formula.Bug (bug_type, pos) ->
       (* TODO: When can we reject? *)
       Self.result ~source:pos "%a" Formula.pp_bug_type bug_type;

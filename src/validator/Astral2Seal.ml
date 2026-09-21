@@ -2,9 +2,14 @@ open Astral
 open SL
 open MemoryModel
 
+let convert_smt_term t = match SMT.view t with
+  | Variable v -> Obj.magic v (* TODO *)
+  | _ -> failwith ("TODO: " ^ SMT.show t)
+
 let convert_term t = match SL.Term.view t with
   | Var v -> v
-  | _ -> assert false
+  | SmtTerm term -> convert_smt_term term
+  | _ -> failwith ("TODO: " ^ SL.Term.show t)
 
 let convert_target c ys =
   let f i y = (Field.show @@ List.nth (StructDef.get_fields c) i, convert_term y) in
