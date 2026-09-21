@@ -104,7 +104,7 @@ let rec materialize (var : Formula.var) (f : Formula.t) : Formula.t list =
       (* length 0 cases *)
       :: (f |> add_eq nls.first nls.top |> materialize var)
   | Predicate (name, xs) ->
-    Config.Self.debug "Unfolding predicate %s %S" name (SL.Variable.show_list xs);
+    Config.Self.debug "Unfolding predicate %s(%s)" name (SL.Variable.show_list xs);
     GlobalSID.cases name (List.map SL.Term.of_var xs)
     |> List.map (fun case -> SL.mk_star [Astral_query.convert f; case])
     |> List.map Astral2Seal.convert

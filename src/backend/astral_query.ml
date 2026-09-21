@@ -127,7 +127,7 @@ let check_inequality (lhs : Formula.var) (rhs : Formula.var)
 
 let drop_freed =
   SL.map_view (function
-    | Predicate (name, _, _) when String.equal name "freed" -> `Modify SL.emp
+    | Predicate (name, _, _, _) when String.equal name "freed" -> `Modify SL.emp
     | _ -> `Skip
   )
 

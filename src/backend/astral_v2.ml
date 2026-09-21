@@ -46,6 +46,7 @@ let[@warning "-8"] convert f =
         let vars = vars |> List.map snd |> List.map v in
         let struct_def = Types.get_struct_def @@ SL.Variable.get_sort src in
         SL.mk_pto_struct (v src) struct_def vars
+    | Predicate (name, xs) -> SL.mk_predicate name @@ List.map v xs
     | LS ls -> (
         let first = v ls.first in
         let next = v ls.next in
