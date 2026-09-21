@@ -160,8 +160,9 @@ let get_inner_loops (block : block) =
   !loops
 
 (** Decides whether to stop the analysis *)
-let doStmt_verifier (stmt : stmt) (_ : t) : t stmtaction =
+let doStmt_verifier (stmt : stmt) (state : t) : t stmtaction =
   let loop_cycles = !Func_call.function_context.loop_cycles in
+  Invariants.add stmt state;
   match stmt.skind with
   (* stop when reaching the maximum number of loop
       iterations in underapproximation mode *)
