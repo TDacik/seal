@@ -24,7 +24,10 @@ let check_memcleanup main =
 
 let produce_correctness_witness () =
   if not @@ Config.Output_witness.is_default () then
-    let results = !Func_call.function_context.results in
+    let results = Invariants.get () in
+    (*Invariants.H.iter (fun stmt state ->
+      Format.printf "%a (%a): %a\n" Common.pretty_stmt_loc stmt Cil_datatype.Stmt.pretty stmt Formula.pp_state state
+    ) results;*)
     let path = Filepath.to_string_abs @@ Config.Output_witness.get () in
     Correctness_witness.write results path
   else ()
