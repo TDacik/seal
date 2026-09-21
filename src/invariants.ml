@@ -11,10 +11,12 @@ let check_invariant inv =
   else ()
 
 let add stmt f =
-  List.iter check_invariant f;
-  let current = try H.find !self stmt with Not_found -> [] in
-  H.remove !self stmt;
-  H.add !self stmt (f @ current)
+  if Common.is_loop stmt then (
+    List.iter check_invariant f;
+    let current = try H.find !self stmt with Not_found -> [] in
+    H.remove !self stmt;
+    H.add !self stmt (f @ current))
+  else ()
 
 let get () =
   H.filter_map_inplace (fun _ states -> Some (BatList.unique ~eq:Stdlib.(=) states)) !self;
