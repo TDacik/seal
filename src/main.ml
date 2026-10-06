@@ -35,8 +35,9 @@ let main () =
   (* initialize the solver instance *)
   Astral_query.init ();
 
-  if Config.Input_witness.is_default () then verify ()
-  else Validator.validate @@ Config.Input_witness.get ()
+  if Config.Validator.is_enabled ()
+  then Validator.validate @@ Config.Validator.Input.get ()
+  else verify ()
 
 (* register the analysis entrypoint into Frama-C  *)
 let () =

@@ -142,12 +142,27 @@ module Print_version = Self.False (struct
 end)
 
 (** Witness validation *)
+module Validator = struct
 
-module Input_witness = Self.Filepath
-  (struct
-    let option_name = "-seal-validate-witness"
-    let help = "Validate memory safety correctness witness in format 2.2"
-    let arg_name = "path"
-    let existence = Frama_c_kernel.Filepath.Must_exist
-    let file_kind = "yml"
-  end)
+  let group = Self.add_group "Witness validation"
+
+  let () = Parameter_customize.set_group group
+  module DryRun = Self.False
+    (struct
+      let option_name = "-seal-validator-dry-run"
+      let help = "Parse the witness only"
+    end)
+
+  let () = Parameter_customize.set_group group
+  module Input = Self.Filepath
+    (struct
+      let option_name = "-seal-validate-witness"
+      let help = "Validate memory safety correctness witness in format 2.2"
+      let arg_name = "path"
+      let existence = Frama_c_kernel.Filepath.Must_exist
+      let file_kind = "yml"
+    end)
+
+  let is_enabled () = not @@ Input.is_default ()
+
+end

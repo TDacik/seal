@@ -216,8 +216,7 @@ let doStmt_validator (stmt : stmt) (state : t) : t stmtaction =
   | _ -> SDefault
 
 let doStmt (stmt : stmt) (state : t) : t stmtaction =
-  let doing_validation = not @@ Config.Input_witness.is_default () in
-  if doing_validation
+  if Config.Validator.is_enabled ()
   then doStmt_validator stmt state
   else doStmt_verifier stmt state
 

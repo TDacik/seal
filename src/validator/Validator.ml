@@ -9,6 +9,8 @@ let reject = "Witness rejected"
 let unknown = "Validation inconclusive"
 let error = "Witness has errors"
 
+exception DryRun
+
 let run_validation witness_path =
   Self.debug "Validating witness %a" Filepath.pretty_rel witness_path;
   let file = Ast.get () in
@@ -17,8 +19,12 @@ let run_validation witness_path =
   let w = YamlParser.parse @@ Format.asprintf "%a" Filepath.pretty_abs witness_path in
   Self.debug "Input witness:\n%a" CorrectnessWitness.pp w;
   GlobalWitness.set w;
-  Verifier.run_analysis ();
-  Self.result "%s" success
+
+  if Validator.DryRun.get ()
+  then raise DryRun
+  else
+    Verifier.run_analysis ();
+    Self.result "%s" success
 
 let validate witness_path =
   try run_validation witness_path with e -> (
@@ -42,6 +48,8 @@ let validate witness_path =
       (* TODO: When can we reject? *)
       Self.result ~source:pos "%a" Formula.pp_bug_type bug_type;
       Self.result "%s" unknown
+    | DryRun ->
+      Self.result "%s (dry run)" unknown
     | e ->
      let backtrace = Printexc.get_backtrace () in
      Common.warning "BACKTRACE: \n%s" backtrace;
