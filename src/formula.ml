@@ -1,33 +1,60 @@
 open Astral
+
+open Config
 open Common
 
 (** This module defines the types representing SL formulas in the analyzer, and
     a set of functions for their manipulation *)
 
+open AbstractionHint
+
 type var = SL.Variable.t
-type ls = { first : var; next : var; min_len : int }
-type dls = { first : var; last : var; prev : var; next : var; min_len : int }
-type nls = { first : var; top : var; next : var; min_len : int }
+
+type ls = {
+  info : sll_info;
+  first : SL.Variable.t;
+  next : SL.Variable.t;
+  min_len : Int.t;
+} [@@deriving compare, equal]
+
+type dls = {
+  info : dll_info;
+  first : SL.Variable.t;
+  last : SL.Variable.t;
+  prev : SL.Variable.t;
+  next : SL.Variable.t;
+  min_len : Int.t;
+} [@@deriving compare, equal]
+
+type nls = {
+  info : nll_info;
+  first : SL.Variable.t;
+  top : SL.Variable.t;
+  next : SL.Variable.t;
+  min_len : Int.t
+} [@@deriving compare, equal]
 
 type pto_target =
-  | LS_t of var
-  | DLS_t of var * var
-  | NLS_t of var * var
-  | Generic of (string * var) list
+  | LS_t of sll_info * SL.Variable.t
+  | DLS_t of dll_info * SL.Variable.t * SL.Variable.t
+  | NLS_t of nll_info * SL.Variable.t * SL.Variable.t
+  | Generic of (String.t * SL.Variable.t) List.t
+  [@@deriving compare, equal]
 
 type atom =
-  | Eq of var list
-  | Distinct of var * var
-  | Freed of var
-  | PointsTo of var * pto_target
+  | Eq of SL.Variable.t List.t
+  | Distinct of SL.Variable.t * SL.Variable.t
+  | Freed of SL.Variable.t
+  | PointsTo of SL.Variable.t * pto_target
   | LS of ls
   | DLS of dls
   | NLS of nls
-  | Predicate of string * var list
-  | IntEq of var * int
-  | Ref of var * var
+  | Predicate of String.t * SL.Variable.t List.t
+  | IntEq of SL.Variable.t * Int.t
+  | Ref of SL.Variable.t * SL.Variable.t
+  [@@deriving compare, equal]
 
-type t = atom list
+type t = atom List.t [@@deriving compare, equal]
 
 (* Exceptions used to report bugs in the analyzed program *)
 type bug_type =
@@ -41,8 +68,9 @@ let report_bug (bug_type : bug_type) =
   let pos, _ = Current_loc.get () in
   raise @@ Bug (bug_type, pos)
 
+
 (* state stored by each CFG node in dataflow analysis *)
-type state = t list
+type state = t List.t [@@deriving compare, equal]
 
 let nil = SL.Variable.nil
 let int_sort = Sort.mk_bitvector 32
@@ -53,15 +81,15 @@ let nondet = SL.Variable.mk "_nondet" int_sort
 
 (** Constructors *)
 
-let mk_ls (first : var) (next : var) (min_len : int) =
-  LS { first; next; min_len }
+let mk_ls info (first : var) (next : var) (min_len : int) =
+  LS { info; first; next; min_len }
 
-let mk_dls (first : var) (last : var) (prev : var) (next : var) (min_len : int)
+let mk_dls info (first : var) (last : var) (prev : var) (next : var) (min_len : int)
     =
-  DLS { first; last; prev; next; min_len }
+  DLS { info; first; last; prev; next; min_len }
 
-let mk_nls (first : var) (top : var) (next : var) (min_len : int) =
-  NLS { first; top; next; min_len }
+let mk_nls info (first : var) (top : var) (next : var) (min_len : int) =
+  NLS { info; first; top; next; min_len }
 
 (** Formatters *)
 
@@ -77,15 +105,15 @@ let atom_to_string : atom -> 'a =
       vars |> List.map v |> String.concat " = " |> Format.sprintf "(%s)"
   | Distinct (lhs, rhs) -> Format.sprintf "(%s != %s)" (v lhs) (v rhs)
   | Freed var -> "freed(" ^ v var ^ ")"
-  | PointsTo (src, LS_t next) -> Format.sprintf "(%s -> %s)" (v src) (v next)
-  | PointsTo (src, DLS_t (next, prev)) ->
+  | PointsTo (src, LS_t (_, next)) -> Format.sprintf "(%s -> %s)" (v src) (v next)
+  | PointsTo (src, DLS_t (_, next, prev)) ->
       Format.sprintf "(%s -> n:%s,p:%s)" (v src) (v next) (v prev)
-  | PointsTo (src, NLS_t (top, next)) ->
+  | PointsTo (src, NLS_t (_, top, next)) ->
       Format.sprintf "(%s -> t:%s,n:%s)" (v src) (v top) (v next)
-  | PointsTo (src, Generic vars) ->
+  | PointsTo (src, Generic target) ->
       Format.sprintf "(%s -> {%s})" (v src)
-        (vars
-        |> List.map (fun (name, var) -> Format.sprintf "%s:%s" name (v var))
+        (target
+        |> List.map (fun (field, var) -> Format.sprintf "%s:%s" (field) (v var))
         |> String.concat " ")
   | LS ls -> Format.sprintf "ls_%d+(%s,%s)" ls.min_len (v ls.first) (v ls.next)
   | DLS dls ->
@@ -98,6 +126,21 @@ let atom_to_string : atom -> 'a =
       Format.sprintf "%s(%s)" name (String.concat "," @@ List.map v params)
   | IntEq (var, value) -> Format.sprintf "(%s = %i)" (v var) value
   | Ref (src, target) -> Format.sprintf "ref(%s,%s)" (v src) (v target)
+
+let pp_pto_target fmt target =
+  let pp_var = SL.Variable.pp in
+  match target with
+  | LS_t (_, next) ->
+      Format.fprintf fmt "LS(next: %a)" pp_var next
+  | DLS_t (_, next, prev) ->
+      Format.fprintf fmt "DLS(next: %a, prev: %a)" pp_var next pp_var prev
+  | NLS_t (_, top, next) ->
+      Format.fprintf fmt "NLS(top: %a, next: %a)" pp_var top pp_var next
+  | Generic xs ->
+      List.map (fun (field, x) -> Format.asprintf "%s: %a" field pp_var x) xs
+      |> String.concat ", "
+      |> (fun s -> "(" ^ s ^ ")")
+      |> Format.fprintf fmt "%s"
 
 let pp_atom (fmt : Format.formatter) (atom : atom) =
   Format.fprintf fmt "%s" (atom_to_string atom)
@@ -136,10 +179,10 @@ let get_vars (f : t) : var list =
       | Eq vars -> vars
       | Distinct (lhs, rhs) -> [ lhs; rhs ]
       | Freed var -> [ var ]
-      | PointsTo (src, LS_t next) -> [ src; next ]
-      | PointsTo (src, DLS_t (next, prev)) -> [ src; next; prev ]
-      | PointsTo (src, NLS_t (top, next)) -> [ src; next; top ]
-      | PointsTo (src, Generic vars) -> src :: List.map snd vars
+      | PointsTo (src, LS_t (_, next)) -> [ src; next ]
+      | PointsTo (src, DLS_t (_, next, prev)) -> [ src; next; prev ]
+      | PointsTo (src, NLS_t (_, top, next)) -> [ src; next; top ]
+      | PointsTo (src, Generic target) -> src :: List.map snd target
       | LS ls -> [ ls.first; ls.next ]
       | DLS dls -> [ dls.first; dls.last; dls.prev; dls.next ]
       | NLS nls -> [ nls.first; nls.top; nls.next ]
@@ -158,30 +201,27 @@ let subsitute_in_atom (old_var : var) (new_var : var) : atom -> atom =
   | Eq vars -> Eq (List.map v vars)
   | Distinct (lhs, rhs) -> Distinct (v lhs, v rhs)
   | Freed var -> Freed (v var)
-  | PointsTo (src, LS_t next) -> PointsTo (v src, LS_t (v next))
-  | PointsTo (src, DLS_t (next, prev)) ->
-      PointsTo (v src, DLS_t (v next, v prev))
-  | PointsTo (src, NLS_t (top, next)) -> PointsTo (v src, NLS_t (v top, v next))
-  | PointsTo (src, Generic vars) ->
-      PointsTo
-        (v src, Generic (vars |> List.map (fun (name, var) -> (name, v var))))
-  | LS ls -> LS { first = v ls.first; next = v ls.next; min_len = ls.min_len }
+  | PointsTo (src, LS_t (info, next)) -> PointsTo (v src, LS_t (info, v next))
+  | PointsTo (src, DLS_t (info, next, prev)) ->
+      PointsTo (v src, DLS_t (info, v next, v prev))
+  | PointsTo (src, NLS_t (info, top, next)) -> PointsTo (v src, NLS_t (info, v top, v next))
+  | PointsTo (src, Generic target) ->
+      PointsTo (v src, Generic (target |> List.map (fun (name, var) -> (name, v var))))
+  | LS ls -> LS {ls with first = v ls.first; next = v ls.next}
   | DLS dls ->
       DLS
-        {
+        {dls with
           first = v dls.first;
           last = v dls.last;
           prev = v dls.prev;
           next = v dls.next;
-          min_len = dls.min_len;
         }
   | NLS nls ->
       NLS
-        {
+        {nls with
           first = v nls.first;
           top = v nls.top;
           next = v nls.next;
-          min_len = nls.min_len;
         }
   | Predicate (name, params) -> Predicate (name, List.map v params)
   | IntEq (lhs, value) -> IntEq (v lhs, value)
@@ -214,7 +254,7 @@ let standardize_fresh_var_names (f : t) : t =
 (** Atoms *)
 
 let add_atom (atom : atom) (f : t) : t = atom :: f
-let remove_atom (atom : atom) (f : t) : t = f |> List.filter (( <> ) atom)
+let remove_atom (atom : atom) (f : t) : t = BatList.remove_if (equal_atom atom) f
 
 (** Equivalence classes *)
 
@@ -293,12 +333,12 @@ let get_spatial_atom_from (src : var) (f : t) : atom =
 
 let get_target_of_atom (field : Types.field_type) (atom : atom) : var =
   match (atom, field) with
-  | PointsTo (_, LS_t next), Next -> next
-  | PointsTo (_, DLS_t (next, _)), Next -> next
-  | PointsTo (_, DLS_t (_, prev)), Prev -> prev
-  | PointsTo (_, NLS_t (top, _)), Top -> top
-  | PointsTo (_, NLS_t (_, next)), Next -> next
-  | PointsTo (_, Generic vars), Other field -> List.assoc field vars
+  | PointsTo (_, LS_t (_, next)), Next -> next
+  | PointsTo (_, DLS_t (_, next, _)), Next -> next
+  | PointsTo (_, DLS_t (_, _, prev)), Prev -> prev
+  | PointsTo (_, NLS_t (_, top, _)), Top -> top
+  | PointsTo (_, NLS_t (_, _, next)), Next -> next
+  | PointsTo (_, Generic target), Other field -> List.assoc field target
   | LS ls, Next -> ls.next
   | DLS dls, Next -> dls.next
   | DLS dls, Prev -> dls.prev
@@ -307,9 +347,9 @@ let get_target_of_atom (field : Types.field_type) (atom : atom) : var =
   | _ -> assert false
 
 let get_targets_of_atom : atom -> var list = function
-  | PointsTo (_, LS_t next) -> [ next ]
-  | PointsTo (_, DLS_t (next, prev)) -> [ next; prev ]
-  | PointsTo (_, NLS_t (top, next)) -> [ top; next ]
+  | PointsTo (_, LS_t (_, next)) -> [ next ]
+  | PointsTo (_, DLS_t (_, next, prev)) -> [ next; prev ]
+  | PointsTo (_, NLS_t (_, top, next)) -> [ top; next ]
   | PointsTo (_, Generic vars) -> List.map snd vars
   | LS ls -> [ ls.next ]
   | DLS dls -> [ dls.prev; dls.next ]
@@ -347,17 +387,20 @@ let change_pto_target (src : var) (field : Types.field_type) (new_target : var)
   in
   let new_struct =
     match (field, old_struct) with
-    | Next, LS_t _ -> LS_t new_target
-    | Next, DLS_t (_, prev) -> DLS_t (new_target, prev)
-    | Next, NLS_t (top, _) -> NLS_t (top, new_target)
-    | Prev, DLS_t (next, _) -> DLS_t (next, new_target)
-    | Top, NLS_t (_, next) -> NLS_t (new_target, next)
+    | Next, LS_t (info, _) -> LS_t (info, new_target)
+    | Next, DLS_t (info, _, prev) -> DLS_t (info, new_target, prev)
+    | Next, NLS_t (info, top, _) -> NLS_t (info, top, new_target)
+    | Prev, DLS_t (info, next, _) -> DLS_t (info, next, new_target)
+    | Top, NLS_t (info, _, next) -> NLS_t (info, new_target, next)
     | Other field, Generic vars ->
-        Generic (List.map (fun ((field', x) as old) ->
+        Generic (List.map (fun ((field', _) as old) ->
           if String.equal field field' then (field', new_target)
           else old
         ) vars)
-    | _ -> assert false
+    | field, old_struct ->
+      Self.abort "Field %a is not compatible with struct %a"
+        Types.pp_field_type field
+        pp_pto_target old_struct
   in
   f |> remove_spatial_from src |> add_atom (PointsTo (src, new_struct))
 
@@ -372,10 +415,11 @@ let assert_allocated (var : var) (f : t) : unit =
   ignore @@ get_spatial_atom_from var f
 
 let pto_to_list : atom -> atom = function
-  | PointsTo (first, LS_t next) -> LS { first; next; min_len = 1 }
-  | PointsTo (src, DLS_t (next, prev)) ->
-      DLS { first = src; last = src; next; prev; min_len = 1 }
-  | PointsTo (first, NLS_t (top, next)) -> NLS { first; top; next; min_len = 1 }
+  | PointsTo (first, LS_t (info, next)) ->
+      LS { info; first; next; min_len = 1 }
+  | PointsTo (src, DLS_t (info, next, prev)) ->
+      DLS { info; first = src; last = src; next; prev; min_len = 1 }
+  | PointsTo (first, NLS_t (info, top, next)) -> NLS { info; first; top; next; min_len = 1 }
   | other -> other
 
 (** Pure atoms *)
@@ -463,7 +507,7 @@ let update_ref (var : var) (target : var) (f : t) : t =
 
 let get_int_val_opt (var : var) : t -> int option =
   List.find_map (function
-    | IntEq (v, value) when var = v -> Some value
+    | IntEq (v, value) when SL.Variable.equal var v -> Some value
     | _ -> None)
 
 let get_int_val (var : var) (f : t) : int = get_int_val_opt var f |> Option.get
@@ -510,7 +554,7 @@ let split_by_reachability (vars : var list) (f : t) : t * t =
 
   let reachable_equiv_classes =
     rest |> get_equiv_classes
-    |> List.filter (List.exists (fun var -> List.mem var reachable_vars))
+    |> List.filter (List.exists (fun var -> SL.Variable.MonoList.mem var reachable_vars))
     |> List.map (fun cls -> Eq cls)
   in
 
@@ -518,9 +562,9 @@ let split_by_reachability (vars : var list) (f : t) : t * t =
     List.filter
       (function
         | Distinct (lhs, rhs) ->
-            List.mem lhs reachable_vars && List.mem rhs reachable_vars
+            SL.Variable.MonoList.mem lhs reachable_vars && SL.Variable.MonoList.mem rhs reachable_vars
         | Freed var | IntEq (var, _) | Ref (var, _) ->
-            List.mem var reachable_vars
+            SL.Variable.MonoList.mem var reachable_vars
         | _ -> false)
       rest
   in
@@ -529,7 +573,7 @@ let split_by_reachability (vars : var list) (f : t) : t * t =
     reachable_equiv_classes @ reachable_spatials @ other_reachable_atoms
   in
   let unreachable =
-    List.filter (fun atom -> not @@ List.mem atom reachable) rest
+    List.filter (fun atom -> not @@ BatList.mem_cmp compare_atom atom reachable) rest
   in
   (reachable, unreachable)
 
@@ -556,7 +600,7 @@ let canonicalize ?(rename_fresh = true) (f : t) : t =
     | Distinct (lhs, rhs) ->
         if c lhs rhs > 0 then Distinct (lhs, rhs) else Distinct (rhs, lhs)
     | atom -> atom)
-  |> List.sort_uniq compare |> standardize_fresh_var_names
+  |> List.sort_uniq compare_atom |> standardize_fresh_var_names
 
 let canonicalize_state ?(rename_fresh = true) (state : state) : state =
   state |> List.map (canonicalize ~rename_fresh) |> List.sort_uniq compare

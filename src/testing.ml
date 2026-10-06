@@ -70,6 +70,16 @@ let assert_eq_state (lhs : state) (rhs : state) : bool =
     show_state rhs;
     false)
 
+(* Default predicate infos *)
+
+let sll_info = Obj.magic 0
+let dll_info = Obj.magic 0
+let nll_info = Obj.magic 0
+
+let mk_ls = Formula.mk_ls sll_info
+let mk_dls = Formula.mk_dls dll_info
+let mk_nls = Formula.mk_nls nll_info
+
 (* tests for Formula cannot be in the Formula module due to circular dependency *)
 module Tests = struct
   (* we want the bounds sorted [1+, 2+, 3+, ...] so that during deduplication

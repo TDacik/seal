@@ -1,7 +1,6 @@
 open Cil
 open Cil_types
 open Astral
-open Constants
 open Common
 open Config
 
@@ -10,9 +9,9 @@ open Config
 
 (** Classification of structs *)
 type struct_type =
-  | Sll of compinfo * fieldinfo
-  | Dll of compinfo * fieldinfo * fieldinfo
-  | Nl  of compinfo * fieldinfo * fieldinfo
+  | Sll of AbstractionHint.sll_info
+  | Dll of AbstractionHint.dll_info
+  | Nl  of AbstractionHint.nll_info
   | Struct of compinfo
 
 (** Classification of struct fields *)
@@ -25,15 +24,15 @@ let pp_field_type fmt = function
   | Other name -> Format.fprintf fmt "Other: %s" name
   | Data -> Format.fprintf fmt "data"
 
-let pp_struct_type fmt stype =
+let rec pp_struct_type fmt stype =
   let open Cil_printer in
   match stype with
-  | Sll (compinfo, next) ->
-    Format.fprintf fmt "%a[%a]" Cil_printer.pp_compinfo compinfo pp_field next
-  | Dll (compinfo, next, prev) ->
-    Format.fprintf fmt "%a[%a, %a]" Cil_printer.pp_compinfo compinfo pp_field next pp_field prev
-  | Nl (compinfo, top, next) ->
-    Format.fprintf fmt "%a[%a, %a]" Cil_printer.pp_compinfo compinfo pp_field top pp_field next
+  | Sll {compinfo; next_field} ->
+    Format.fprintf fmt "%a[%a]" Cil_printer.pp_compinfo compinfo pp_field next_field
+  | Dll {compinfo; next_field; prev_field} ->
+    Format.fprintf fmt "%a[%a, %a]" Cil_printer.pp_compinfo compinfo pp_field next_field pp_field prev_field
+  | Nl {compinfo; top_field; down_field; sll_info} ->
+    Format.fprintf fmt "%a[%a, %a, %a]" Cil_printer.pp_compinfo compinfo pp_field top_field pp_field down_field pp_struct_type (Sll sll_info)
   | Struct compinfo ->
     Format.fprintf fmt "%a" Cil_printer.pp_compinfo compinfo
 
@@ -52,7 +51,7 @@ let get_struct_pointer_fields (structure : compinfo) : fieldinfo list =
   |> List.filter (fun field -> is_relevant_type field.ftype)
 
 let rec get_self_and_sll_fields (structure : compinfo) :
-    fieldinfo list * fieldinfo list =
+    fieldinfo list * (fieldinfo * AbstractionHint.sll_info) list =
   let self_pointers, other_pointers =
     structure |> get_struct_pointer_fields
     |> List.partition (fun field ->
@@ -62,39 +61,43 @@ let rec get_self_and_sll_fields (structure : compinfo) :
            | _ -> false)
   in
   let sll_pointers =
-    List.filter
+    List.filter_map
       (fun field ->
         match Ast_types.unroll_deep_node field.ftype with
         | TPtr { tnode = TComp structure; _ } ->
-          (match get_struct_type structure with Sll _ -> true | _ -> false)
-        | _ -> false)
+          (match get_struct_type structure with Sll sll_info -> Some (field, sll_info) | _ -> None)
+        | _ -> None)
       other_pointers
   in
   (self_pointers, sll_pointers)
 
 (** Determines, which list type a structure represents based on its fields *)
-and get_struct_type (structure : compinfo) : struct_type =
-  let self_pointers, sll_pointers = get_self_and_sll_fields structure in
+and get_struct_type (compinfo : compinfo) : struct_type =
+  let self_pointers, sll_pointers = get_self_and_sll_fields compinfo in
 
   match (self_pointers, sll_pointers) with
-  | [next], [] -> Sll (structure, next)
-  | [top], [next] -> Nl (structure, top, next)
-  | [next; prev], [] -> Dll (structure, next, prev)
-  | _ -> Struct structure
+  | _ when (Config.Validator.is_enabled ())
+      || Config.Abstraction_mode.get () == `Synthesis -> Struct compinfo
+  | [next_field], [] -> Sll {compinfo; next_field}
+  | [top_field], [(down_field, sll_info)] -> Nl {compinfo; top_field; down_field; sll_info}
+  | [next_field; prev_field], [] -> Dll {compinfo; next_field; prev_field}
+  | _ -> Struct compinfo
 
 (** Determines the type of field in the context of lists *)
 let get_field_type (field : fieldinfo) : field_type =
   let self_pointers, sll_pointers = get_self_and_sll_fields field.fcomp in
 
   match (self_pointers, sll_pointers) with
-  | _ when not @@ Config.Input_witness.is_default () -> Other field.fname
+  | _ when (Config.Validator.is_enabled ())
+      || Config.Abstraction_mode.get () == `Synthesis ->
+        Other field.fname
   | [ next ], [] when field.forder = next.forder -> Next
   (* DLL *)
   | [ next; _ ], [] when field.forder = next.forder -> Next
   | [ _; prev ], [] when field.forder = prev.forder -> Prev
   (* NL *)
   | [ top ], [ _ ] when field.forder = top.forder -> Top
-  | [ _ ], [ next ] when field.forder = next.forder -> Next
+  | [ _ ], [ (down, _) ] when field.forder = down.forder -> Next
   | _ -> if is_relevant_type field.ftype then Other field.fname else Data
 
 module HT = Cil_datatype.Typ.Hashtbl
@@ -126,7 +129,6 @@ let c_struct_to_astral structure =
   (sort, MemoryModel.StructDef.mk name fields)
 
 let rec get_type_info (typ : typ) : Sort.t * MemoryModel.StructDef.t =
-  let tt = typ in
   let typ : Cil_types.typ = Ast_types.unroll_deep typ in
   HT.find_opt type_info typ |> function
   | Some result -> result

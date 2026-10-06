@@ -94,14 +94,14 @@ let generalize_similar_formulas (lhs : Formula.t) (rhs : Formula.t) :
       let new_atom =
         match (Formula.pto_to_list first, Formula.pto_to_list second) with
         | LS lhs, LS rhs
-          when { lhs with min_len = 0 } = { rhs with min_len = 0 } ->
+          when Formula.equal_ls { lhs with min_len = 0 } { rhs with min_len = 0 } ->
             Some (Formula.LS { lhs with min_len = min lhs.min_len rhs.min_len })
         | DLS lhs, DLS rhs
-          when { lhs with min_len = 0 } = { rhs with min_len = 0 } ->
+          when Formula.equal_dls { lhs with min_len = 0 } { rhs with min_len = 0 } ->
             Some
               (Formula.DLS { lhs with min_len = min lhs.min_len rhs.min_len })
         | NLS lhs, NLS rhs
-          when { lhs with min_len = 0 } = { rhs with min_len = 0 } ->
+          when Formula.equal_nls { lhs with min_len = 0 } { rhs with min_len = 0 } ->
             Some
               (Formula.NLS { lhs with min_len = min lhs.min_len rhs.min_len })
         | _ -> None
