@@ -1,8 +1,11 @@
 open Cil_types
 open Common
+
+module A = Abstraction
+
 open Astral
 
-let var = Types.varinfo_to_var
+let var = GlobalInfo.varinfo_to_var
 
 let eval_binop (op : binop) (lhs : Formula.var) (rhs : Formula.var)
     (formula : Formula.t) : Formula.t * Formula.var =

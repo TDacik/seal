@@ -72,10 +72,10 @@ let func_call (args : Formula.var list) (func : varinfo) (formula : Formula.t)
   let return_stmt = Kernel_function.find_return func in
 
   let params =
-    Kernel_function.get_formals func |> List.map Types.varinfo_to_var
+    Kernel_function.get_formals func |> List.map GlobalInfo.varinfo_to_var
   in
   let locals =
-    params @ (Kernel_function.get_locals func |> List.map Types.varinfo_to_var)
+    params @ (Kernel_function.get_locals func |> List.map GlobalInfo.varinfo_to_var)
   in
 
   let reachable, unreachable = Formula.split_by_reachability args formula in

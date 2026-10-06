@@ -13,7 +13,7 @@ type t = Formula.state
 
 let copy state = state
 let pretty fmt state = Formula.pp_state fmt state
-let var = Types.varinfo_to_var
+let var = GlobalInfo.varinfo_to_var
 
 (** this is the transfer function for instructions, we take the instr and
     previous state, and create new state *)
