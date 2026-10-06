@@ -3,16 +3,18 @@
    TODO: cleanup *)
 
 open Astral
+open Astral.Preprocessing
 open MemoryModel
 
 open Cabs
-open Cil_datatype
 
 (* Global context *)
 
 let params = ref []
 let location = ref ("", -1)
 let invariant = ref None
+
+let heap_sort = ref HeapSort.empty
 
 (** Utilities *)
 
@@ -21,7 +23,7 @@ let name_equal str = function
 
 let exp_to_string e = match e.expr_node with
    | VARIABLE name -> name
-   | _ -> assert false
+   | _ -> Config.Self.fatal "Unsupported expression: %a" Cprint.print_expression e
 
 let expr_name_equal str e = match e.expr_node with
   | VARIABLE name -> String.equal name str
@@ -43,60 +45,83 @@ let convert_var ?(prefix="") name =
       try SL.Term.of_var @@ List.find (fun v -> String.equal (SL.Variable.get_name v) name) !params
       with Not_found -> raise @@ Exceptions.UnknownVariable (Option.get !invariant, name)
 
-let rec convert_term e = match e.expr_node with
+let rec convert_term e =
+  match e.expr_node with
   | VARIABLE name when String.equal name "NULL" -> SL.Term.nil
   | VARIABLE name -> convert_var name
 
-  | CONSTANT (CONST_INT  i) -> SL.Term.mk_smt @@ SMT.Arithmetic.mk_const @@ int_of_string i
+  | CONSTANT (CONST_INT  i) -> SL.Term.mk_smt @@ SMT.Bitvector.mk_const_of_int (int_of_string i) (* TODO *) 32
   (*| CONSTANT (CONST_BOOL b) -> SL.Term.mk_smt @@ SMT.Boolean.mk_const b*)
   | CONSTANT _ -> failwith "unsupported constant"
 
-  | UNARY _ -> failwith "unary"
-  | BINARY _ -> failwith "binary"
+  (* Dereference *)
+  | UNARY (MEMOF, e) ->
+    let e = convert_term e in
+    let field =
+      SL.Term.get_sort e
+      |> (fun sort -> HeapSort.find_target sort !heap_sort)
+      |> StructDef.get_fields
+      |> List.hd (* TODO: Check that this is indeed boxed type *)
+    in
+    SL.Term.mk_heap_term field e
 
-  | INDEX (base, offset) -> failwith "index"
+  | BINARY (op, _, _) -> Config.Self.fatal "binary: %a" Cabs_debug.pp_bin_op op
+
+  | INDEX (_, _) -> failwith "index"
 
   | PAREN e -> convert_term e
 
   | MEMBEROF _ -> failwith "memberof"
   | MEMBEROFPTR (base, field) ->
     let base = convert_term base in
-    let field = Field.mk field @@ SL.Term.get_sort base in
+    let field =
+      SL.Term.get_sort base
+      |> (fun sort -> HeapSort.find_target sort !heap_sort)
+      |> StructDef.find_field (fun f -> (Field.show f) = field)
+    in
     SL.Term.mk_heap_term field base
 
   | CALL (fn, [what; where], _) when expr_name_equal "at" fn ->
-    if expr_name_equal "Pre" where then convert_var ~prefix:"A$" (exp_to_string what)
+    if expr_name_equal "Pre" where then
+      let aux = convert_term what in
+      SL.Term.map_vars (fun v -> SL.Variable.rename (fun old ->"A$" ^ old) v) aux
     else failwith "todo: at"
 
   | CALL _ -> failwith "unknown call"
 
   | _ -> failwith @@ Format.asprintf "Unknown term: %a" Cprint.print_expression e
 
-let rec convert e = match e.expr_node with
+let rec convert e =
+  match e.expr_node with
+  | BINARY (EQ, {expr_node = UNARY (MEMOF, e1); _}, e2) ->
+    let e1 = convert_term e1 in
+    let field =
+      SL.Term.get_sort e1
+      |> (fun sort -> HeapSort.find_target sort !heap_sort)
+      |> StructDef.get_fields
+      |> List.hd (* TODO: Check that this is indeed boxed type *)
+    in
+    let e1 = SL.Term.mk_heap_term field e1 in
+    let e2 = convert_term e2 in
+    SL.mk_eq [e1; e2]
+
   | BINARY (EQ, e1, e2) -> SL.mk_eq @@ List.map convert_term [e1; e2]
   | BINARY (NE, e1, e2) -> SL.mk_distinct @@ List.map convert_term [e1; e2]
   | BINARY (AND, e1, e2) -> SL.mk_and @@ List.map convert [e1; e2]
   | BINARY (OR, e1, e2) -> SL.mk_or @@ List.map convert [e1; e2]
 
-  | CALL (exp, [base; size], _) when expr_name_equal "canAccess" exp ->
-    let base = convert_term base in
-    (match SL.Term.view base with
-    | Var v ->
-      (* TODO: check that accesses cover whole var *)
-      let sort = SL.Variable.get_sort v in
-      let cons = Types.get_struct_def sort in
-      let fields = StructDef.get_fields cons in
-      let rhs = List.map (fun f -> SL.Term.mk_fresh_var "e" @@ Field.get_sort f) fields in
-      SL.mk_pto_struct (SL.Term.of_var v) cons rhs
+  | CALL (exp, [base_e; _], _) when expr_name_equal "canAccess" exp ->
+    (* TODO: check size *)
+    let base = convert_term base_e in
+    let sort = SL.Term.get_sort base in
+    let cons = Types.get_struct_def sort in
+    let fields = StructDef.get_fields cons in
+    let rhs = List.map (fun f -> SL.Term.mk_fresh_var "e" @@ Field.get_sort f) fields in
+    SL.mk_pto_struct base cons rhs
 
-    | HeapTerm (f, source) ->
-      (* TODO: check access exists for other fields *)
-      let sort = SL.Term.get_sort base in
-      let cons = Types.get_struct_def sort in
-      let fields = StructDef.get_fields cons in
-      let rhs = List.map (fun f -> SL.Term.mk_fresh_var "e" @@ Field.get_sort f) fields in
-      SL.mk_pto_struct source cons rhs
-    | _ -> assert false)
+  | CALL (exp, _, _) when expr_name_equal "canAccess" exp ->
+    Config.Self.fatal "\\canAcess expects two parameters"
+
 
   | CALL (exp, xs, _) when expr_name_equal "separated" exp ->
     SL.mk_star @@ List.map convert xs
@@ -107,13 +132,16 @@ let rec convert e = match e.expr_node with
     let name = exp_to_string exp in
     SL.mk_predicate name @@ List.map convert_term params
 
+
   | UNARY _ -> failwith "unary"
-  | BINARY _ -> failwith "binary"
+  | BINARY (_, e1, e2) ->
+      Config.Self.fatal "%a\n%a" Cabs_debug.pp_exp e1 Cabs_debug.pp_exp e2
   | CAST _ -> failwith "cast"
   | PAREN e -> convert e
   | MEMBEROF _ -> failwith "memberof"
   | MEMBEROFPTR _ -> failwith "memberof_ptr"
-  | _ -> failwith @@ (Format.asprintf "%a" Cabs_debug.pp_exp e)
+  | _ ->
+      Config.Self.fatal "convert: %a" Cabs_debug.pp_exp e
 
 let get_formula = function
   | RETURN (exp, _) -> convert exp
@@ -129,7 +157,7 @@ let map_cases fn phi = match SL.view phi with
 let to_precise_hack = SL.map_view (function And xs -> `Modify (SL.mk_star xs) | _ -> `Skip)
 
 let fn phi : SL.t =
-  let vars = SL.free_vars phi in
+  let vars = SL.free_vars ~with_nil:false ~with_pure:true phi in
   let existentials = List.filter is_existential vars in
   SL.mk_exists existentials phi
   |> to_precise_hack
@@ -141,6 +169,7 @@ let get pos body ps cabs =
   params := ps;
   location := pos;
   invariant := Some RawInvariant.{location = snd pos; raw_content = body; should_be_inductive = false (* not relevant *)};
+  heap_sort := Astral.Solver.get_heap_sort (Option.get !Common.solver);
   List.find_map (function
     | FUNDEF (_, name, block, _, _) when name_equal "main" name ->
       let phi = get_formula @@ (List.hd block.bstmts).stmt_node in
