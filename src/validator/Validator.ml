@@ -36,7 +36,7 @@ let validate witness_path =
       (* TODO: When can we reject? *)
       Self.result "Formula provided for line %d may not be an invariant:" invariant.location;
       Self.result "%s" (SL.show invariant.content);
-      Self.debug  "State is: %a" Formula.pp_state state;
+      Self.debug  "State is:\n%a" Formula.pp_state state;
       Self.result "%s" unknown
     | Exceptions.UnknownVariable (invariant, name) ->
       Self.abort "Error when parsing invariant for line %d: %s: Variable %s does not exist in the current context"

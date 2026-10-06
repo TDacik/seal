@@ -10,7 +10,10 @@ let is_match _filename kf line =
   let stop = e.pos_lnum in
   start <= line
   && line <= stop
-  && Filepath.equal (Filepath.of_string filename) s.pos_path
+  && Kernel_function.is_definition kf (* Prevent lookup in Frama-c's declarations *)
+  (* TODO: handle multiple files
+
+    && Filepath.equal (Filepath.of_string filename) s.pos_path*)
 
 let find_kf_by_line filename line : Kernel_function.t option =
   Globals.Functions.fold (fun kf acc -> match acc with
@@ -27,4 +30,5 @@ let find_varinfo_by_name scope name =
   match kf with
   | Some kf ->
     Globals.Syntactic_search.find_in_scope ~strict:false name (Whole_function kf)
-  | None -> Globals.Syntactic_search.find_in_scope ~strict:false name Global
+  | None ->
+    Globals.Syntactic_search.find_in_scope ~strict:false name Global

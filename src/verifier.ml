@@ -1,7 +1,4 @@
-open Config
 open Dataflow2
-open Astral
-open Common
 
 (** This module is the entrypoint of the analysis, it runs the preprocessing and
     the dataflow analysis itself *)
