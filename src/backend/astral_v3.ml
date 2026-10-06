@@ -4,14 +4,14 @@ open Formula
 
 (** TODO: do not used SID directly *)
 let init ~backend ~encoding ~dump_queries () =
-  if Config.Input_witness.is_default () then (
-    GlobalSID.register_user_defined ls;
+  if not @@ Config.Validator.is_enabled () then (
+    GlobalSID.register_user_defined @@ ls ();
     GlobalSID.register_user_defined ls_two_plus;
-    GlobalSID.register_user_defined dls;
+    GlobalSID.register_user_defined @@ dls ();
     GlobalSID.register_user_defined dls_three_plus;
-    GlobalSID.register_user_defined dls_simple;
+    GlobalSID.register_user_defined @@ dls_simple ();
     GlobalSID.register_user_defined dls_simple_two_plus;
-    GlobalSID.register_user_defined nls;
+    GlobalSID.register_user_defined @@ nls ();
     GlobalSID.register_user_defined nls_two_plus;
   );
   Freed.register ();
@@ -33,19 +33,25 @@ let is_unconstrained var formula =
   Common.is_fresh_var var
   && Formula.count_relevant_occurences var formula == 1
 
+let convert_var v =
+  SL.Variable.rename (String.map (function '#' | '$' | '!' -> '_' | c -> c)) v
+  |> SL.Term.of_var
+
 let[@warning "-8"] convert f =
-  let v = SL.Term.of_var in
+  let v = convert_var in
   let map_atom = function
     | Eq vars when List.exists (SL.Variable.equal Formula.nondet) vars -> SL.emp
     | Eq vars -> SL.mk_eq (List.map v vars)
     | Distinct (lhs, rhs) -> SL.mk_distinct2 (v lhs) (v rhs)
     | Freed var -> SL_builtins.mk_freed (v var)
-    | PointsTo (src, LS_t next) -> SL_builtins.mk_pto_ls (v src) ~next:(v next)
-    | PointsTo (src, DLS_t (next, prev)) ->
+    | PointsTo (src, LS_t (_, next)) -> SL_builtins.mk_pto_ls (v src) ~next:(v next)
+    | PointsTo (src, DLS_t (_, next, prev)) ->
         SL_builtins.mk_pto_dls (v src) ~next:(v next) ~prev:(v prev)
-    | PointsTo (src, NLS_t (top, next)) ->
+    | PointsTo (src, NLS_t (_, top, next)) ->
         SL_builtins.mk_pto_nls (v src) ~top:(v top) ~next:(v next)
     | PointsTo (src, Generic vars) ->
+        if SL.Variable.is_nil src then SL.ff
+        else
         let vars = vars |> List.map snd |> List.map v in
         let struct_def = Types.get_struct_def @@ SL.Variable.get_sort src in
         SL.mk_pto_struct (v src) struct_def vars
