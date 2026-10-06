@@ -140,7 +140,7 @@ let rec get_type_info (typ : typ) : Sort.t * MemoryModel.StructDef.t =
             let st = get_struct_type structure in
             structures := st :: !structures;
             (match st with
-            | _ when not @@ Config.Input_witness.is_default () -> c_struct_to_astral structure
+            | _ when Config.Validator.is_enabled () || Config.Abstraction_mode.get () == `Synthesis -> c_struct_to_astral structure
             | Sll _ -> (SL_builtins.loc_ls, SL_builtins.struct_ls)
             | Dll _ -> (SL_builtins.loc_dls, SL_builtins.struct_dls)
             | Nl _ -> (SL_builtins.loc_nls, SL_builtins.struct_nls)

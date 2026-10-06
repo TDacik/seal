@@ -1,3 +1,4 @@
+open Astral
 open Common
 
 (** This module implements the abstraction that turns chains of pointer atoms
