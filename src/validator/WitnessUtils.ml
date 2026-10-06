@@ -1,15 +1,13 @@
 open Cil_types
 open Filepath
 
-let is_match filename kf line =
+let is_match _filename kf line =
   let (s, e) = match kf.fundec with
     | Definition (_, loc) -> loc
     | Declaration (_, _, _, loc) -> loc
   in
   let start = s.pos_lnum in
   let stop = e.pos_lnum in
-  let current = Filepath.of_string filename in
-  let actual = s.pos_path in
   start <= line
   && line <= stop
   && Filepath.equal (Filepath.of_string filename) s.pos_path

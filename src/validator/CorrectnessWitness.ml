@@ -3,7 +3,7 @@ open Astral
 module RawInvariant = struct
 
   type t = {
-    location: int               (*TODO: Cil_types.location*);
+    location: int;             (*TODO: Cil_types.location*)
     raw_content: string;
     should_be_inductive : bool;
   }
@@ -13,22 +13,22 @@ end
 module Invariant = struct
 
   type t = {
-    location: int               (*TODO: Cil_types.location*);
+    location: int;              (*TODO: Cil_types.location*)
     raw_content: string;
     should_be_inductive : bool;
     content: SL.t;
   }
 
   let show self =
-    let info =
-      if self.should_be_inductive then "(inductive) "
-      else ""
-    in
-    Format.asprintf "%s%s" (SL.show self.content) info
+    match SL.view self.content with
+    | Or psis ->
+      List.map (fun psi -> Format.asprintf "    -> %s" (SL.show psi)) psis
+      |> String.concat "\n"
+    | _ ->
+      List.map (fun psi -> Format.asprintf "    -> %s" (SL.show psi)) [self.content]
+      |> String.concat "\n"
 
 end
-
-open Invariant
 
 module InvariantMap = struct
 
@@ -36,7 +36,7 @@ module InvariantMap = struct
 
   let show self =
     bindings self
-    |> List.map (fun (line, invariant) -> Format.asprintf " - line %d: %s" line (Invariant.show invariant))
+    |> List.map (fun (line, invariant) -> Format.asprintf " - line %d:\n %s" line (Invariant.show invariant))
     |> String.concat "\n"
 
 end
@@ -54,5 +54,5 @@ let empty = {predicates = []; invariants = InvariantMap.empty}
 let pp fmt witness =
   Format.fprintf fmt "@[<v>Predicates:@,";
   List.iter (fun id -> InductiveDefinition.pp fmt id) witness.predicates;
-  Format.fprintf fmt "@,Invariants:@,%s@]"
+  Format.fprintf fmt "@,\nInvariants:\n@,%s@]"
     (InvariantMap.show witness.invariants)

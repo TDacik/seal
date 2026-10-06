@@ -1,8 +1,6 @@
 open Cil
 open Cil_types
 open Common
-open Astral
-open Constants
 
 (** This module implements multiple simple preprocessing passes, and serves as
     the entrypoint to preprocessing *)
@@ -86,12 +84,6 @@ let remove_const_conditions =
 (** This function runs all preprocessing passes in order *)
 let preprocess () =
   let file = Ast.get () in
-
-  let functions =
-    List.filter_map
-      (function GFun (func, _) -> Some func | _ -> None)
-      file.globals
-  in
 
   Visitor.visitFramacFileFunctions remove_const_conditions file;
   Visitor.visitFramacFileFunctions remove_local_init file;

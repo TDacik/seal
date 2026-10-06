@@ -75,7 +75,6 @@ let mk_witness results =
   let specification = "G valid-free && G valid-deref && G valid-memtrack" in
 
   let data_model = get_data_model () in
-  let architecture = get_architecture () in
   let files = get_files_with_hashes () in
 
   let task_yaml = `O [

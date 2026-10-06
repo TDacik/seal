@@ -2,8 +2,6 @@
 
 open Astral
 
-open Cil_datatype
-
 open CorrectnessWitness
 
 let path_ref = ref ""
@@ -87,7 +85,6 @@ let sort_of_c_type str =
   let ctype =
     if String.starts_with ~prefix:"struct " str then
       let name = String.split_on_char ' ' str |> List.tl |> List.hd in
-      Config.Self.result "Looking for %s" name;
       Globals.Types.find_type Struct name
     else
       let name = String.split_on_char ' ' str |> List.hd in
@@ -127,8 +124,8 @@ let parse_params = function
 let parse_predicate = function
   | `O ["predicate_definition", decl] ->
     let name = find_string "name" decl in
-    let types, params = parse_params @@ find "parameters" decl in
-    let definition = ExprParser.parse ("none", 0) (* TODO! *) name types params @@ find_string "definition" decl in
+    let _, params = parse_params @@ find "parameters" decl in
+    let definition = ExprParser.parse ("none", 0) params @@ find_string "definition" decl in
     InductiveDefinition.mk name params definition
   | `O _ -> failwith "TODO"
   | _ -> failwith "Expecting object in declaration"
@@ -158,7 +155,7 @@ let parse_invariant = function
       location = line;
       raw_content = value;
       should_be_inductive = List.mem "inductive" labels;
-      content = ExprParser.parse (file, line) "invariant" [] [] value;
+      content = ExprParser.parse (file, line) [] value;
     }
     in
     (line, invariant)
