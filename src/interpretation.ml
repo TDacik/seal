@@ -206,9 +206,9 @@ let interpret_instr (instr : instr) (formula : Formula.t) : Formula.t list =
       (* evaluate function call on all (formula * arguments) tuples *)
       let formulas, return_vars =
         List.concat_map
-          (fun (formula, args) ->
+          (fun (formula, input) ->
             let formulas, return_vars =
-              Transfer.call lhs_sort func (List.rev args) formula
+              Transfer.call lhs_sort lhs_option func (List.rev input) (List.rev args) formula
             in
             List.combine formulas return_vars)
           inputs

@@ -202,7 +202,7 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
   (*            |> Formula.remove_spatial_from var *)
   (*            |> Formula.substitute_by_fresh var *)
   (*            |> Formula.add_atom spatial_atom) *)
-  | "free", [ src ] -> (
+  | "free", [ src ], _ -> (
       try
         formula |> materialize src
         |> List.map (Formula.remove_spatial_from src)
@@ -213,9 +213,9 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
       | Formula.Bug (Invalid_deref (var, formula), pos) ->
           raise @@ Formula.Bug (Invalid_free (var, formula), pos)
       | e -> raise e)
-  | "__VERIFIER_nondet_int", _ -> ([ formula ], [ Formula.nondet ])
-  | "__VERIFIER_print_state", _ ->
-      Config.Self.result ~current:true "%a" Formula.pp_formula formula;
+  | "__VERIFIER_nondet_int", _, _ -> ([ formula ], [ Formula.nondet ])
+  | "__VERIFIER_print_state", _,  _ ->
+      Config.Self.result ~current:true "\027[36m%a\027[0m" Formula.pp_formula formula;
       ([formula], [Formula.nil])
 
-  | _, args -> Func_call.func_call args func formula lhs_sort
+  | _, args, _ -> Func_call.func_call args func formula lhs_sort
