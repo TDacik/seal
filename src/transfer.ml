@@ -112,9 +112,27 @@ let rec materialize (var : Formula.var) (f : Formula.t) : Formula.t list =
     |> List.filter Astral_query.check_sat
   | _ -> assert false
 
+let pointed_type_or_type t =
+  let open Cil_types in
+  match t.tnode with
+  | TPtr t -> t
+  | _ -> t
+
+let is_single_elem lhs size =
+  let t = pointed_type_or_type @@ Cil.typeOfLval @@ Option.get lhs in
+  let size_type = Cil.bytesSizeOf t in
+  let size_requested = Cil.constFoldToInt ~machdep:true size in
+  match size_requested with
+    | None -> false
+    | Some n -> Z.equal n (Z.of_int size_type)
+
+
 (** transfer function for function calls *)
-let call (lhs_sort : SL.Sort.t) (func : Cil_types.varinfo)
-    (args : Formula.var list) (formula : Formula.t) :
+let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
+    (func : Cil_types.varinfo)
+    (args : Formula.var list)
+    (orig_args : Cil_types.exp list)
+    (formula : Formula.t) :
     Formula.t list * Formula.var list =
   let get_allocation (init_vars_to_null : bool) =
     let lhs = SL.Variable.mk_fresh "func_ret" lhs_sort in
@@ -145,6 +163,7 @@ let call (lhs_sort : SL.Sort.t) (func : Cil_types.varinfo)
               |> List.map (SL.Variable.mk_fresh (SL.Variable.get_name lhs))
           in
           Formula.PointsTo (lhs, Generic (List.combine names vars))
+      | _ -> Config.Self.fatal ~current:true "Type of allocation does not match"
     in
     let allocation = formula |> Formula.add_atom pto in
     if Config.Svcomp_mode.get () then ([ allocation ], [ lhs ])
@@ -160,9 +179,10 @@ let call (lhs_sort : SL.Sort.t) (func : Cil_types.varinfo)
         [ lhs; lhs ] )
   in
 
-  match (func.vname, args) with
-  | "malloc", _ -> get_allocation false
-  | "calloc", _ -> get_allocation true
+  match (func.vname, args, orig_args) with
+  | "malloc", _, [size] when is_single_elem lhs_orig size -> get_allocation false
+  | "calloc", _, _ -> get_allocation true (* TODO: check size *)
+  | "malloc", _, _ -> Config.Self.fatal ~current:true "Memory blocks/arrays"
   (*TODO: *)
   (* | "realloc", var :: _ -> *)
   (*     (* realloc changes the pointer value => all references to `var` are now dangling *) *)
