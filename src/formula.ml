@@ -81,6 +81,15 @@ let nondet = SL.Variable.mk "_nondet" int_sort
 
 (** Constructors *)
 
+let mk_pto_ls info source next =
+  PointsTo (source, (LS_t (info, next)))
+
+let mk_pto_dls info source next prev =
+  PointsTo (source, (DLS_t (info, next, prev)))
+
+let mk_pto_nls info source top next =
+  PointsTo (source, (NLS_t (info, top, next)))
+
 let mk_ls info (first : var) (next : var) (min_len : int) =
   LS { info; first; next; min_len }
 
@@ -262,7 +271,8 @@ let get_equiv_classes : t -> var list list =
   List.filter_map (function Eq list -> Some list | _ -> None)
 
 let find_equiv_class (var : var) (f : t) : var list option =
-  f |> get_equiv_classes |> List.find_opt (List.mem var)
+  f |> get_equiv_classes |> List.filter (List.mem var)
+  |> function [] -> None | xs -> Some (SL.Variable.MonoList.unique @@ List.concat xs)
 
 let map_equiv_classes (fn : var list -> var list) : t -> t =
   List.map (function Eq vars -> Eq (fn vars) | other -> other)
@@ -321,7 +331,11 @@ let make_var_explicit_src (var : var) (f : t) : t =
   | None -> f
 
 let get_spatial_atom_from_opt (src : var) (f : t) : atom option =
-  f |> make_var_explicit_src src |> List.find_opt (is_spatial_source src)
+  match find_equiv_class src f with
+  | None ->
+    List.find_opt (fun atom -> is_spatial_source src atom) f
+  | Some cls ->
+    List.find_opt (fun atom -> List.exists (fun v -> is_spatial_source v atom) cls) f
 
 let get_spatial_atom_from_first_opt (src : var) (f : t) : atom option =
   f |> make_var_explicit_src src |> List.find_opt (is_spatial_source_first src)
@@ -486,10 +500,11 @@ let add_distinct (lhs : var) (rhs : var) (f : t) : t =
 
 (** Stack pointers *)
 
-let get_ref_opt (var : var) : t -> var option =
+let get_ref_opt (var : var) (f : t) : var option =
+  let eq_class = Option.value ~default:[var] @@ find_equiv_class var f in
   List.find_map (function
-    | Ref (src, target) when var = src -> Some target
-    | _ -> None)
+    | Ref (src, target) when SL.Variable.MonoList.mem src eq_class -> Some target
+    | _ -> None) f
 
 let get_ref (src : var) (f : t) : var =
   get_ref_opt src f |> function
@@ -498,9 +513,9 @@ let get_ref (src : var) (f : t) : var =
 
 let update_ref (var : var) (target : var) (f : t) : t =
   if get_ref_opt var f |> Option.is_some then
-    List.map
-      (function Ref (src, _) when var = src -> Ref (src, target) | a -> a)
-      f
+    List.map (function
+      | Ref (src, _) when SL.Variable.equal src var -> Ref (src, target)
+      | a -> a) f
   else add_atom (Ref (var, target)) f
 
 (** Integers *)
