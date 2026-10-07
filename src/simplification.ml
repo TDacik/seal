@@ -29,7 +29,7 @@ let reduce_equiv_classes (formula : Formula.t) : Formula.t =
   (* filter out equivalence classes with less than two members *)
   |> List.filter (function [] | [ _ ] -> false | _ -> true)
   |> List.fold_left remove_fresh_vars formula
-  (* remove multiple occurences of a single variable 
+  (* remove multiple occurences of a single variable
      in an equiv class created by a substitution *)
   |> Formula.map_equiv_classes @@ List.sort_uniq SL.Variable.compare
   (* filter out equivalence classes reduced to <2 members *)
@@ -136,10 +136,27 @@ let remove_empty_lists (formula : Formula.t) : Formula.t =
           Formula.remove_atom (NLS nls) formula
       | _ -> formula)
     formula formula
+(** Removes formulas that are covered by other formulas using entailment *)
+let deduplicate_formulas (state : Formula.state) : Formula.state =
+  let is_covered current to_keep =
+    if Config.Simple_join.get () then
+      List.exists
+        (fun formula_to_keep ->
+          Astral_query.check_entailment [ current ] [ formula_to_keep ])
+        to_keep
+    else Astral_query.check_entailment [ current ] to_keep
+  in
+
+  state
+  |> List.sort Formula.compare_bounds
+  |> List.fold_left
+       (fun to_keep current ->
+         if is_covered current to_keep then to_keep else current :: to_keep)
+       []
+
 
 module Tests = struct
   open Testing
-  open Formula
 
   let%test "remove_irrelevant_vars" =
     let f = [ Distinct (nil, x') ] |> remove_irrelevant_atoms in
@@ -148,4 +165,28 @@ module Tests = struct
   let%test "remove_irrelevant_vars_2" =
     let f = [ Freed x'; Distinct (nil, x') ] |> remove_irrelevant_atoms in
     assert_eq f []
+
+  let%test "atom_deduplication" =
+    let input = [ Distinct (x, y); Distinct (x, y); Distinct (x, y) ] in
+    let expected = [ Distinct (x, y) ] in
+    assert_eq (List.sort_uniq compare_atom input) expected
+
+  let%test "join_1" =
+    let input = [ [ mk_pto_ls x y' ]; [ mk_pto_ls x z' ] ] in
+    let expected = [ [ mk_pto_ls x y' ] ] in
+    let joined = deduplicate_formulas input in
+    assert_eq_state joined expected
+
+  let%test "join_2" =
+    let input = [ [ mk_pto_ls x y ]; [ mk_pto_ls x z ] ] in
+    let joined = deduplicate_formulas input in
+    assert_eq_state joined input
+
+  let%test "join_ls" =
+    List.init 3 Fun.id
+    |> List.for_all (fun len ->
+           let input = [ [ mk_ls x y' len ]; [ mk_ls x z' len ] ] in
+           let expected = [ [ mk_ls x y' len ] ] in
+           let joined = deduplicate_formulas input in
+           assert_eq_state joined expected)
 end

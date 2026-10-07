@@ -33,31 +33,13 @@ let doInstr _ (instr : instr) (prev_state : t) : t =
 
 let computeFirstPredecessor _ state = state
 
-(** Removes formulas that are covered by other formulas using entailment *)
-let deduplicate_formulas (state : t) : t =
-  let is_covered current to_keep =
-    if Config.Simple_join.get () then
-      List.exists
-        (fun formula_to_keep ->
-          Astral_query.check_entailment [ current ] [ formula_to_keep ])
-        to_keep
-    else Astral_query.check_entailment [ current ] to_keep
-  in
-
-  state
-  |> List.sort Formula.compare_bounds
-  |> List.fold_left
-       (fun to_keep current ->
-         if is_covered current to_keep then to_keep else current :: to_keep)
-       []
-
 (** Iterate through all formulas of new_state [phi], and each one that doesn't
     satisfy (phi => old) has to be added to [old]. If old is not changed, None
     is returned. *)
 let combinePredecessors _ ~old:(old_state : t) (new_state : t) : t option =
   Async.yield ();
 
-  let joined_state = deduplicate_formulas @@ new_state @ old_state in
+  let joined_state = Simplification.deduplicate_formulas @@ new_state @ old_state in
 
   let state_changed joined_state old_state =
     if Config.Simple_join.get () then
@@ -245,7 +227,7 @@ let doEdge (prev_stmt : stmt) (next_stmt : stmt) (state : t) : t =
   in
 
   let deduplicate_states : t -> t =
-    if Config.Edge_deduplication.get () then deduplicate_formulas else Fun.id
+    if Config.Edge_deduplication.get () then Simplification.deduplicate_formulas else Fun.id
   in
 
   let open Simplification in
@@ -284,32 +266,4 @@ module StmtStartData = struct
   let add stmt = Hashtbl.add !Func_call.function_context.results stmt
   let iter f = Hashtbl.iter f !Func_call.function_context.results
   let length () = Hashtbl.length !Func_call.function_context.results
-end
-
-module Tests = struct
-  open Testing
-
-  let%test "atom_deduplication" =
-    let input = [ Distinct (x, y); Distinct (x, y); Distinct (x, y) ] in
-    let expected = [ Distinct (x, y) ] in
-    assert_eq (List.sort_uniq compare input) expected
-
-  let%test "join_1" =
-    let input = [ [ PointsTo (x, LS_t y') ]; [ PointsTo (x, LS_t z') ] ] in
-    let expected = [ [ PointsTo (x, LS_t y') ] ] in
-    let joined = deduplicate_formulas input in
-    assert_eq_state joined expected
-
-  let%test "join_2" =
-    let input = [ [ PointsTo (x, LS_t y) ]; [ PointsTo (x, LS_t z) ] ] in
-    let joined = deduplicate_formulas input in
-    assert_eq_state joined input
-
-  let%test "join_ls" =
-    List.init 3 Fun.id
-    |> List.for_all (fun len ->
-           let input = [ [ mk_ls x y' len ]; [ mk_ls x z' len ] ] in
-           let expected = [ [ mk_ls x y' len ] ] in
-           let joined = deduplicate_formulas input in
-           assert_eq_state joined expected)
 end
