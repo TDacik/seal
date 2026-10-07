@@ -1,22 +1,15 @@
-open Config
 open Witness_common
 
-open Cil_datatype
-
 let formula_str f =
-  SL2C.convert f
-
-let state_yaml s =
-  List.map formula_str s
-  |> List.map (fun s -> "(" ^ s ^ ")")
-  |> String.concat " || "
+  SL2C.convert_state f
 
 let yaml_loc loc =
   let pos : Filepath.position = fst loc in
   `O [
     "file_name", `String (Filepath.to_string_abs pos.pos_path);
     "line",      `Float (Float.of_int pos.pos_lnum);
-    (*"column",    `Float (Float.of_int pos.pos_cnum);*)
+    (* Frama-c does not know columns,
+       "column",    `Float (Float.of_int pos.pos_cnum);*)
   ]
 
 let yaml_location stmt =
@@ -24,14 +17,15 @@ let yaml_location stmt =
   `O [
     "file_name", `String (Filepath.to_string_abs pos.pos_path);
     "line",      `Float (Float.of_int pos.pos_lnum);
-    (*"column",    `Float (Float.of_int pos.pos_cnum);*)
+    (* Frama-c does not know columns,
+       "column",    `Float (Float.of_int pos.pos_cnum);*)
   ]
 
 let yaml_invariant stmt state =
   `O ["invariant", `O [
     "type",     `String "loop_memory_invariant";
     "location", yaml_location stmt;
-    "value",    `String (state_yaml state);
+    "value",    `String (SL2C.convert_state state);
     "format",   `String "ext_c_expression";
   ]]
 
@@ -43,15 +37,6 @@ let mk_invariants (results : Formula.state Invariants.H.t) =
       if Common.is_loop stmt then Some (yaml_invariant stmt state)
       else None
     )
-
-(** TODO: This is a temporal solution for predicates.
-
-type predicate = {
-  name : string;
-  params : (string * Typ.t) list;
-  definition : Astral.SL.t;
-}
-*)
 
 let yaml_params (name, typ) =
   `O [

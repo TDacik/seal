@@ -310,7 +310,7 @@ let normalise f =
       apply_substitution f subst)
   |> (fun f -> remove_irrelevant_atoms f (mark_unused_param f))
 
-let convert f =
+let convert_formula f =
   let f' = normalise f in
   let f''=
     if List.exists Common.is_fresh_var @@ Formula.get_vars f'
@@ -328,3 +328,30 @@ let convert f =
   | spatial, [] -> F.sprintf "\\separated(%s)" (String.concat ", " spatial)
   | [sp], p -> F.sprintf "\\separated(%s) && %s" sp (String.concat " && " p)
   | s, p -> F.sprintf "\\separated(%s) && %s" (String.concat ", " s) (String.concat " && " p)
+
+(* Conversion of states *)
+
+let should_split = function
+  | DLS {prev; _} -> Common.is_fresh_var prev
+  | _ -> false
+
+let rec split f =
+  match List.find_opt should_split f with
+  | None -> [f]
+  | Some (DLS {first; next; last; prev; info; min_len} as dls) ->
+    let f' = BatList.remove_if (Formula.equal_atom dls) f in
+    let n = SL.Variable.mk_fresh "n" Sort.loc_nil in (* TODO: sort *)
+    List.concat_map split [
+      Eq [first; next] :: f';
+      PointsTo (first, DLS_t (info, n, prev))
+        :: mk_dls info n last first next min_len
+        :: f'
+    ]
+  | _ -> assert false
+
+let convert_state state =
+  List.map split state
+  |> List.concat
+  |> List.map convert_formula
+  |> List.map (fun s -> "(" ^ s ^ ")")
+  |> String.concat " || "
