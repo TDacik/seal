@@ -38,9 +38,9 @@ let convert_to_ls (formula : Formula.t) : Formula.t =
            is_in_formula first_ls.first first_ls.next Types.Next formula
            (* middle must be fresh variable, and occur only in these two predicates *)
            && is_unique_fresh first_ls.next formula
-           (* src must be different from dst (checked using solver) *)
-           && Astral_query.check_inequality first_ls.first second_ls.next
-                formula ->
+           (* src must be different from dst (checked using solver) or dst must be nil *)
+           && (Astral_query.check_inequality first_ls.first second_ls.next formula
+              || SL.Variable.is_nil second_ls.next) ->
         let min_length = min 2 (first_ls.min_len + second_ls.min_len) in
         formula
         |> Formula.remove_spatial_from first_ls.first
@@ -83,10 +83,10 @@ let convert_to_dls (formula : Formula.t) : Formula.t =
            && (not @@ Formula.is_eq first_dls.first first_dls.prev formula)
            && (not @@ Formula.is_eq second_dls.last second_dls.next formula)
            (* DLS must not be cyclic (checked both forward and backward) *)
-           && Astral_query.check_inequality first_dls.first second_dls.next
-                formula
-           && Astral_query.check_inequality second_dls.last first_dls.prev
-                formula ->
+           && (Astral_query.check_inequality first_dls.first second_dls.next
+                formula || SL.Variable.is_nil second_dls.next)
+           && (Astral_query.check_inequality second_dls.last first_dls.prev
+                formula || SL.Variable.is_nil first_dls.prev) ->
         let min_length = min 3 (first_dls.min_len + second_dls.min_len) in
         formula
         |> Formula.remove_spatial_from first_dls.first
@@ -168,9 +168,9 @@ let convert_to_nls (formula : Formula.t) : Formula.t =
            is_in_formula first_nls.first first_nls.top Types.Top formula
            (* middle must be fresh variable, and occur only in these two predicates *)
            && is_unique_fresh first_nls.top formula
-           (* src must be different from dst (checked using solver) *)
-           && Astral_query.check_inequality first_nls.first second_nls.top
-                formula -> (
+           (* src must be different from dst (checked using solver) or dst must be nil *)
+           && (Astral_query.check_inequality first_nls.first second_nls.top formula
+               || SL.Variable.is_nil second_nls.top) -> (
         (* common variable `next` must lead to the same target *)
         match join_sublists first_nls.first second_nls.first formula with
         | Some (formula, next) ->
