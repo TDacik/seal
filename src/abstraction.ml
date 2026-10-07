@@ -72,6 +72,10 @@ let convert_to_dls (formula : Formula.t) : Formula.t =
     (* conditions for abstraction *)
       when (* first_dls must still be in formula *)
            is_in_formula first_dls.first first_dls.next Types.Next formula
+
+           (* Do not include program variables as last parameter of DLS. Needed
+              just to produce witnesses that are easier to validate. *)
+           && Common.is_fresh_var second_dls.last
            (* middle vars must be fresh, and occur only in these two predicates *)
            && (SL.Variable.equal first_dls.first first_dls.last
               || is_unique_fresh first_dls.last formula)
