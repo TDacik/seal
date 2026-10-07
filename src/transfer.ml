@@ -116,14 +116,14 @@ let rec materialize (var : Formula.var) (f : Formula.t) : Formula.t list =
     res
   | _ -> assert false
 
-let pointed_type_or_type t =
+let pointed_type t =
   let open Cil_types in
-  match t.tnode with
+  match (Ast_types.unroll_deep t).tnode with
   | TPtr t -> t
-  | _ -> t
+  | _ -> assert false
 
 let is_single_elem lhs size =
-  let t = pointed_type_or_type @@ Cil.typeOfLval @@ Option.get lhs in
+  let t = pointed_type @@ Cil.typeOfLval @@ Option.get lhs in
   let size_type = Cil.bytesSizeOf t in
   let size_requested = Cil.constFoldToInt ~machdep:true size in
   match size_requested with
@@ -191,7 +191,7 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
   match (func.vname, args, orig_args) with
   | "malloc", _, [size] when is_single_elem lhs_orig size -> get_allocation false
   | "calloc", _, _ -> get_allocation true (* TODO: check size *)
-  | "malloc", _, _ -> Config.Self.fatal ~current:true "Memory blocks/arrays"
+  | "malloc", _, _ -> Config.Self.not_yet_implemented ~current:true "Memory blocks/arrays"
   (*TODO: *)
   (* | "realloc", var :: _ -> *)
   (*     (* realloc changes the pointer value => all references to `var` are now dangling *) *)
