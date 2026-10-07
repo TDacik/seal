@@ -9,7 +9,9 @@ let verify () =
     Verifier.run_analysis ();
     (*produce_correctness_witness ();*)
     Self.result "Successful_verification"
-   with e -> (
+  with
+    | (Log.AbortError _ | Log.AbortFatal _ | Log.FeatureRequest _) as e -> raise e
+    | e -> (
      let backtrace = Printexc.get_backtrace () in
      Common.warning "BACKTRACE: \n%s" backtrace;
 
@@ -31,6 +33,8 @@ let verify () =
 
 let main () =
   Printexc.record_backtrace true;
+
+  UnsupportedChecker.run ();
 
   (* initialize the solver instance *)
   Astral_query.init ();
