@@ -46,7 +46,7 @@ let convert_to_ls (formula : Formula.t) : Formula.t =
         |> Formula.remove_spatial_from first_ls.first
         |> Formula.remove_spatial_from second_ls.first
         |> Formula.add_atom
-           @@ Formula.mk_ls first_ls.first second_ls.next min_length
+           @@ Formula.mk_ls second_ls.info first_ls.first second_ls.next min_length
     | _ -> formula
   in
 
@@ -73,9 +73,9 @@ let convert_to_dls (formula : Formula.t) : Formula.t =
       when (* first_dls must still be in formula *)
            is_in_formula first_dls.first first_dls.next Types.Next formula
            (* middle vars must be fresh, and occur only in these two predicates *)
-           && (first_dls.first = first_dls.last
+           && (SL.Variable.equal first_dls.first first_dls.last
               || is_unique_fresh first_dls.last formula)
-           && (second_dls.first = second_dls.last
+           && (SL.Variable.equal second_dls.first second_dls.last
               || is_unique_fresh second_dls.first formula)
            (* [prev] pointer from second DLS must lead to end of the previous DLS *)
            && Formula.is_eq first_dls.last second_dls.prev formula
@@ -92,7 +92,7 @@ let convert_to_dls (formula : Formula.t) : Formula.t =
         |> Formula.remove_spatial_from first_dls.first
         |> Formula.remove_spatial_from second_dls.first
         |> Formula.add_atom
-           @@ Formula.mk_dls first_dls.first second_dls.last first_dls.prev
+           @@ Formula.mk_dls second_dls.info first_dls.first second_dls.last first_dls.prev
                 second_dls.next min_length
     | _ -> formula
   in
@@ -179,7 +179,7 @@ let convert_to_nls (formula : Formula.t) : Formula.t =
             |> Formula.remove_spatial_from first_nls.first
             |> Formula.remove_spatial_from second_nls.first
             |> Formula.add_atom
-               @@ Formula.mk_nls first_nls.first second_nls.top next min_length
+               @@ Formula.mk_nls second_nls.info first_nls.first second_nls.top next min_length
         | None -> formula)
     | _ -> formula
   in
