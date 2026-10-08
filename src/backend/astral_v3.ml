@@ -4,6 +4,7 @@ open Formula
 
 (** TODO: do not used SID directly *)
 let init ~backend ~encoding ~dump_queries () =
+  GlobalSID.reset ();
   if not @@ Config.Validator.is_enabled () then (
     GlobalSID.register_user_defined @@ ls ();
     GlobalSID.register_user_defined ls_two_plus;

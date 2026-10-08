@@ -50,8 +50,26 @@ module DLS = struct
   let z' = SL.Variable.mk "z!" SL_builtins.loc_dls
 end
 
+(* NLS sort vars *)
+module NLS = struct
+  let u = SL.Variable.mk "u" SL_builtins.loc_nls
+  let v = SL.Variable.mk "v" SL_builtins.loc_nls
+  let w = SL.Variable.mk "w" SL_builtins.loc_nls
+  let x = SL.Variable.mk "x" SL_builtins.loc_nls
+  let y = SL.Variable.mk "y" SL_builtins.loc_nls
+  let z = SL.Variable.mk "z" SL_builtins.loc_nls
+
+  (* fresh vars *)
+  let u' = SL.Variable.mk "u'" SL_builtins.loc_nls
+  let v' = SL.Variable.mk "v!" SL_builtins.loc_nls
+  let w' = SL.Variable.mk "w!" SL_builtins.loc_nls
+  let x' = SL.Variable.mk "x!" SL_builtins.loc_nls
+  let y' = SL.Variable.mk "y!" SL_builtins.loc_nls
+  let z' = SL.Variable.mk "z!" SL_builtins.loc_nls
+end
+
 let assert_eq (lhs : t) (rhs : t) : bool =
-  if canonicalize lhs = canonicalize rhs then true
+  if Formula.equal (canonicalize lhs) (canonicalize rhs) then true
   else (
     print_warn_nl "Formulas do not match:";
     print_warn "RESULT: ";
@@ -61,7 +79,7 @@ let assert_eq (lhs : t) (rhs : t) : bool =
     false)
 
 let assert_eq_state (lhs : state) (rhs : state) : bool =
-  if canonicalize_state lhs = canonicalize_state rhs then true
+  if Formula.equal_state (canonicalize_state lhs) (canonicalize_state rhs) then true
   else (
     print_warn_nl "States do not match:";
     print_warn "RESULT: ";
@@ -134,12 +152,12 @@ module Tests = struct
      the lowest possible bound is picked first *)
   let%test "compare_bounds" =
     let input = [ [ mk_ls x y 1 ]; [ mk_ls x y 2 ] ] in
-    input |> List.sort compare_bounds = input
+    Formula.equal_state (List.sort compare_bounds input) input
 
   let%test "compare_bounds_2" =
     let input = [ [ mk_dls z y u' v' 3 ]; [ mk_dls x y u v 2 ] ] in
     let expected = [ [ mk_dls x y u v 2 ]; [ mk_dls z y u' v' 3 ] ] in
-    input |> List.sort compare_bounds = expected
+    Formula.equal_state (List.sort compare_bounds input) expected
 
   let%test "sl struct creation" =
     let sort = Sort.mk_loc "struct_name" in

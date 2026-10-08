@@ -195,22 +195,22 @@ let convert_to_nls (formula : Formula.t) : Formula.t =
 module Tests_LS = struct
   open Testing
 
+  let () = Astral_query.init ()
+
   (* LS abstraction *)
 
   let%test "abstraction_ls_nothing" =
-    let input = [ PointsTo (x, LS_t y'); PointsTo (y', LS_t z) ] in
+    let input = [ mk_pto_ls x y'; mk_pto_ls y' z ] in
     assert_eq (convert_to_ls input) input
 
   let%test "abstraction_ls_1" =
-    let input =
-      [ PointsTo (x, LS_t y'); PointsTo (y', LS_t z); Distinct (x, z) ]
-    in
+    let input = [ mk_pto_ls x y'; mk_pto_ls y' z; Distinct (x, z) ] in
     let result = convert_to_ls input in
     let expected = [ mk_ls x z 2; Distinct (x, z) ] in
     assert_eq result expected
 
   let%test "abstraction_ls_1_nil" =
-    let input = [ PointsTo (x, LS_t y'); PointsTo (y', LS_t nil) ] in
+    let input = [ mk_pto_ls x y'; mk_pto_ls y' nil ] in
     let result = convert_to_ls input in
     let expected = [ mk_ls x nil 2 ] in
     assert_eq result expected
@@ -218,18 +218,18 @@ module Tests_LS = struct
   let%test "abstraction_ls_2" =
     let input =
       [
-        PointsTo (x, LS_t y');
-        PointsTo (y', LS_t z);
-        PointsTo (u, LS_t v');
-        PointsTo (v', LS_t w);
+        mk_pto_ls x y';
+        mk_pto_ls y' z;
+        mk_pto_ls u v';
+        mk_pto_ls v' w;
         Distinct (u, w);
       ]
     in
     let result = convert_to_ls input in
     let expected =
       [
-        PointsTo (x, LS_t y');
-        PointsTo (y', LS_t z);
+        mk_pto_ls x y';
+        mk_pto_ls y' z;
         mk_ls u w 2;
         Distinct (u, w);
       ]
@@ -239,22 +239,22 @@ module Tests_LS = struct
   let%test "abstraction_ls_3" =
     let input =
       [
-        PointsTo (x, LS_t y');
-        PointsTo (y', LS_t z');
-        PointsTo (z', LS_t w);
+        mk_pto_ls x y';
+        mk_pto_ls y' z';
+        mk_pto_ls z' w;
         Distinct (x, w);
       ]
     in
     let result = convert_to_ls input in
-    let expected = [ mk_ls x z' 2; PointsTo (z', LS_t w); Distinct (x, w) ] in
+    let expected = [ mk_ls x z' 2; mk_pto_ls z' w; Distinct (x, w) ] in
     assert_eq result expected
 
   let%test "abstraction_ls_double" =
     let input =
       [
-        PointsTo (x, LS_t y');
-        PointsTo (y', LS_t z');
-        PointsTo (z', LS_t w);
+        mk_pto_ls x y';
+        mk_pto_ls y' z';
+        mk_pto_ls z' w;
         Distinct (x, w);
       ]
     in
@@ -264,7 +264,7 @@ module Tests_LS = struct
 
   let%test "abstraction_ls_from_ls+pto" =
     let input =
-      [ LS { first = x; next = y'; min_len = 1 }; PointsTo (y', LS_t nil) ]
+      [ mk_ls x y' 1; mk_pto_ls y' nil ]
     in
     let result = convert_to_ls input in
     let expected = [ mk_ls x nil 2 ] in
@@ -273,8 +273,8 @@ module Tests_LS = struct
   let%test "abstraction_ls_from_ls+ls" =
     let input =
       [
-        LS { first = x; next = y'; min_len = 0 };
-        LS { first = y'; next = nil; min_len = 1 };
+        mk_ls x y' 0;
+        mk_ls y' nil 1;
       ]
     in
     let result = convert_to_ls input in
@@ -286,14 +286,16 @@ module Tests_DLS = struct
   open Testing
   open DLS (* test vars with dls sort *)
 
+  let () = Astral_query.init ()
+
   (* DLS abstraction *)
 
   let%test "abstraction_dls_nothing" =
     let input =
       [
-        PointsTo (u, DLS_t (v', z));
-        PointsTo (v', DLS_t (w, u));
-        PointsTo (w, DLS_t (x, v'));
+        mk_pto_dls u v' z;
+        mk_pto_dls v' w u;
+        mk_pto_dls w x v';
         Distinct (u, x);
       ]
     in
@@ -301,7 +303,7 @@ module Tests_DLS = struct
 
   let%test "abstraction_dls_from_pto" =
     let input =
-      [ PointsTo (u', DLS_t (v', nil)); PointsTo (v', DLS_t (nil, u')) ]
+      [ mk_pto_dls u' v' nil; mk_pto_dls v' nil u' ]
     in
     let expected = [ mk_dls u' v' nil nil 2 ] in
     assert_eq (convert_to_dls input) expected
@@ -309,8 +311,8 @@ module Tests_DLS = struct
   let%test "abstraction_dls_1" =
     let input =
       [
-        PointsTo (u, DLS_t (v, z));
-        PointsTo (v, DLS_t (w, u));
+        mk_pto_dls u v z;
+        mk_pto_dls v w u;
         Distinct (v, z);
         Distinct (u, w);
       ]
@@ -321,23 +323,23 @@ module Tests_DLS = struct
   let%test "abstraction_dls_2" =
     let input =
       [
-        PointsTo (u, DLS_t (v', z));
-        PointsTo (v', DLS_t (w, u));
-        PointsTo (w, DLS_t (x, v'));
+        mk_pto_dls u v' z;
+        mk_pto_dls v' w u;
+        mk_pto_dls w x v';
         Distinct (v', z);
       ]
     in
     let expected =
-      [ mk_dls u v' z w 2; PointsTo (w, DLS_t (x, v')); Distinct (v', z) ]
+      [ mk_dls u v' z w 2; mk_pto_dls w x v'; Distinct (v', z) ]
     in
     assert_eq (convert_to_dls @@ convert_to_dls input) expected
 
   let%test "abstraction_dls_2_double" =
     let input =
       [
-        PointsTo (u, DLS_t (v', z));
-        PointsTo (v', DLS_t (w, u));
-        PointsTo (w, DLS_t (x, v'));
+        mk_pto_dls u v' z;
+        mk_pto_dls v' w u;
+        mk_pto_dls w x v';
         Distinct (v', z);
         Distinct (z, w);
         Distinct (x, u);
@@ -351,42 +353,42 @@ module Tests_DLS = struct
   let%test "abstraction_dls_long_from_pto" =
     let input =
       [
-        PointsTo (u, DLS_t (v, z));
-        PointsTo (v, DLS_t (w, u));
-        PointsTo (w, DLS_t (x, v));
-        PointsTo (x, DLS_t (y, w));
-        PointsTo (y, DLS_t (z, x));
+        mk_pto_dls u v z;
+        mk_pto_dls v w u;
+        mk_pto_dls w x v;
+        mk_pto_dls x y w;
+        mk_pto_dls y z x;
       ]
     in
     assert_eq (convert_to_dls input)
       [
-        PointsTo (u, DLS_t (v, z));
+        mk_pto_dls u v z;
         mk_dls v w u x 2;
-        PointsTo (x, DLS_t (y, w));
-        PointsTo (y, DLS_t (z, x));
+        mk_pto_dls x y w;
+        mk_pto_dls y z x;
       ]
 
   let%test "abstraction_dls_long_from_pto_2" =
     let input =
       [
-        PointsTo (u, DLS_t (v, z));
-        PointsTo (v, DLS_t (w', u));
-        PointsTo (w', DLS_t (x, v));
-        PointsTo (x, DLS_t (y, w'));
-        PointsTo (y, DLS_t (z, x));
+        mk_pto_dls u v z;
+        mk_pto_dls v w' u;
+        mk_pto_dls w' x v;
+        mk_pto_dls x y w';
+        mk_pto_dls y z x;
       ]
     in
     assert_eq
       (convert_to_dls @@ convert_to_dls input)
       [
-        PointsTo (u, DLS_t (v, z)); mk_dls v x u y 3; PointsTo (y, DLS_t (z, x));
+        mk_pto_dls u v z; mk_dls v x u y 3; mk_pto_dls y z x;
       ]
 
   let%test "abstraction_dls_from_dls+pto" =
     let input =
       [
-        DLS { first = x; last = y'; prev = nil; next = z; min_len = 1 };
-        PointsTo (z, DLS_t (nil, y'));
+        mk_dls x y' nil z 1;
+        mk_pto_dls z nil y';
       ]
     in
     let expected = [ mk_dls x z nil nil 2 ] in
@@ -395,8 +397,8 @@ module Tests_DLS = struct
   let%test "abstraction_dls_from_dls+dls" =
     let input =
       [
-        DLS { first = x; last = y'; prev = nil; next = z'; min_len = 1 };
-        DLS { first = z'; last = w; prev = y'; next = nil; min_len = 2 };
+        mk_dls x y' nil z' 1;
+        mk_dls z w y' nil 2;
       ]
     in
     let expected = [ mk_dls x w nil nil 3 ] in
@@ -406,19 +408,24 @@ end
 module Tests_NLS = struct
   open Testing
 
+  module LS = Testing (* LS variables *)
+  open NLS            (* NLS variables *)
+
+  let () = Astral_query.init ()
+
   (* NLS abstraction *)
 
   let%test "abstraction_nls_nothing" =
     let input =
-      [ PointsTo (x, NLS_t (y', nil)); PointsTo (y', NLS_t (z, nil)) ]
+      [ mk_pto_nls x y' nil; mk_pto_nls y' z nil ]
     in
     assert_eq (convert_to_nls input) input
 
   let%test "abstraction_nls_nothing_2" =
     let input =
       [
-        PointsTo (x, NLS_t (y', nil));
-        PointsTo (y', NLS_t (z, w));
+        mk_pto_nls x y' nil;
+        mk_pto_nls y' z LS.w;
         Distinct (x, z);
       ]
     in
@@ -428,8 +435,8 @@ module Tests_NLS = struct
   let%test "abstraction_nls_1" =
     let input =
       [
-        PointsTo (x, NLS_t (y', nil));
-        PointsTo (y', NLS_t (z, nil));
+        mk_pto_nls x y' nil;
+        mk_pto_nls y' z nil;
         Distinct (x, z);
       ]
     in
@@ -439,7 +446,7 @@ module Tests_NLS = struct
 
   let%test "abstraction_nls_1_nil" =
     let input =
-      [ PointsTo (x, NLS_t (y', nil)); PointsTo (y', NLS_t (nil, nil)) ]
+      [ mk_pto_nls x y' nil; mk_pto_nls y' nil nil ]
     in
     let result = convert_to_nls input in
     let expected = [ mk_nls x nil nil 2 ] in
@@ -448,18 +455,18 @@ module Tests_NLS = struct
   let%test "abstraction_nls_2" =
     let input =
       [
-        PointsTo (x, NLS_t (y', nil));
-        PointsTo (y', NLS_t (z, nil));
-        PointsTo (u, NLS_t (v', nil));
-        PointsTo (v', NLS_t (w, nil));
+        mk_pto_nls x y' nil;
+        mk_pto_nls y' z nil;
+        mk_pto_nls u v' nil;
+        mk_pto_nls v' w nil;
         Distinct (u, w);
       ]
     in
     let result = convert_to_nls input in
     let expected =
       [
-        PointsTo (x, NLS_t (y', nil));
-        PointsTo (y', NLS_t (z, nil));
+        mk_pto_nls x y' nil;
+        mk_pto_nls y' z nil;
         mk_nls u w nil 2;
         Distinct (u, w);
       ]
@@ -469,24 +476,24 @@ module Tests_NLS = struct
   let%test "abstraction_nls_3" =
     let input =
       [
-        PointsTo (x, NLS_t (y', nil));
-        PointsTo (y', NLS_t (z', nil));
-        PointsTo (z', NLS_t (w, nil));
+        mk_pto_nls x y' nil;
+        mk_pto_nls y' z' nil;
+        mk_pto_nls z' w nil;
         Distinct (x, w);
       ]
     in
     let result = convert_to_nls input in
     let expected =
-      [ mk_nls x z' nil 2; PointsTo (z', NLS_t (w, nil)); Distinct (x, w) ]
+      [ mk_nls x z' nil 2; mk_pto_nls z' w nil; Distinct (x, w) ]
     in
     assert_eq result expected
 
   let%test "abstraction_nls_double" =
     let input =
       [
-        PointsTo (x, NLS_t (y', nil));
-        PointsTo (y', NLS_t (z', nil));
-        PointsTo (z', NLS_t (w, nil));
+        mk_pto_nls x y' nil;
+        mk_pto_nls y' z' nil;
+        mk_pto_nls z' w nil;
         Distinct (x, w);
       ]
     in
@@ -497,11 +504,11 @@ module Tests_NLS = struct
   let%test "abstraction_nls_with_ls_0" =
     let input =
       [
-        PointsTo (x, NLS_t (y', z'));
-        PointsTo (y', NLS_t (u, v'));
+        mk_pto_nls x y' LS.z';
+        mk_pto_nls y' u LS.v';
         Distinct (x, u);
-        LS { first = z'; next = nil; min_len = 0 };
-        LS { first = v'; next = nil; min_len = 0 };
+        mk_ls LS.z' nil 0;
+        mk_ls LS.v' nil 0;
       ]
     in
     let result = convert_to_nls input in
@@ -511,11 +518,11 @@ module Tests_NLS = struct
   let%test "abstraction_nls_with_ls_different_lengths" =
     let input =
       [
-        PointsTo (x, NLS_t (y', z'));
-        PointsTo (y', NLS_t (u, v'));
+        mk_pto_nls x y' LS.z';
+        mk_pto_nls y' u LS.v';
         Distinct (x, u);
-        LS { first = z'; next = nil; min_len = 1 };
-        LS { first = v'; next = nil; min_len = 0 };
+        mk_ls LS.z' nil 1;
+        mk_ls LS.v' nil 1;
       ]
     in
     let result = convert_to_nls input in
@@ -525,10 +532,10 @@ module Tests_NLS = struct
   let%test "abstraction_nls_with_ls_different_lengths_2" =
     let input =
       [
-        PointsTo (x, NLS_t (y', z'));
-        PointsTo (y', NLS_t (nil, v'));
-        LS { first = z'; next = nil; min_len = 1 };
-        LS { first = v'; next = nil; min_len = 2 };
+        mk_pto_nls x y' LS.z';
+        mk_pto_nls y' nil LS.v';
+        mk_ls LS.z' nil 1;
+        mk_ls LS.v' nil 2;
       ]
     in
     let result = convert_to_nls input in
