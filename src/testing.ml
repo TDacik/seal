@@ -71,14 +71,62 @@ let assert_eq_state (lhs : state) (rhs : state) : bool =
     false)
 
 (* Default predicate infos *)
+open AbstractionHint
 
-let sll_info = Obj.magic 0
-let dll_info = Obj.magic 0
-let nll_info = Obj.magic 0
+let loc = Cil_datatype.Location.unknown
+
+let sll_info =
+  let compinfo =
+    Cil_const.mkCompInfo
+      true
+      "builtin_sll"
+      (fun self ->
+        let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
+        Some ["next", typ, None, [], loc]
+      )
+      []
+  in
+  let next_field = List.hd @@ Option.get compinfo.cfields in
+  {compinfo; next_field}
+
+let[@warning "-8"] dll_info =
+  let compinfo =
+    Cil_const.mkCompInfo
+      true
+      "builtin_dll"
+      (fun self ->
+        let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
+        Some ["next", typ, None, [], loc;
+              "prev", typ, None, [], loc]
+      )
+      []
+  in
+  let [next_field; prev_field] = Option.get compinfo.cfields in
+  {compinfo; next_field; prev_field}
+
+let[@warning "-8"] nll_info =
+  let compinfo =
+    Cil_const.mkCompInfo
+      true
+      "builtin_nll"
+      (fun self ->
+        let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
+        let typ_down = Cil_const.mk_tptr @@ Cil_const.mk_tcomp sll_info.compinfo in
+        Some ["top", typ, None, [], loc;
+              "down", typ_down, None, [], loc]
+      )
+      []
+  in
+  let [top_field; down_field] = Option.get compinfo.cfields in
+  {compinfo; top_field; down_field; sll_info}
 
 let mk_ls = Formula.mk_ls sll_info
 let mk_dls = Formula.mk_dls dll_info
 let mk_nls = Formula.mk_nls nll_info
+
+let mk_pto_ls = Formula.mk_pto_ls sll_info
+let mk_pto_dls = Formula.mk_pto_dls dll_info
+let mk_pto_nls = Formula.mk_pto_nls nll_info
 
 (* tests for Formula cannot be in the Formula module due to circular dependency *)
 module Tests = struct
