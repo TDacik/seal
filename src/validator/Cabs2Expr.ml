@@ -156,13 +156,18 @@ let map_cases fn phi = match SL.view phi with
 
 let to_precise_hack = SL.map_view (function And xs -> `Modify (SL.mk_star xs) | _ -> `Skip)
 
+let elim_heap_terms phi =
+  try HeapTermElimination.apply phi
+  with HeapTermElimination.NotSelfFramed term ->
+    Config.Self.fatal "Term %a is not self-framed in %a"
+      SL.Term.pp term SL.pp phi
+
 let fn phi : SL.t =
   let vars = SL.free_vars ~with_nil:false ~with_pure:true phi in
   let existentials = List.filter is_existential vars in
   SL.mk_exists existentials phi
   |> to_precise_hack
-  |> HeapTermElimination.apply
-  (*|> QuantifierElimination.remove_determined*)
+  |> elim_heap_terms
 
 let get pos body ps cabs =
   let open CorrectnessWitness in
