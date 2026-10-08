@@ -131,15 +131,14 @@ let drop_freed =
     | _ -> `Skip
   )
 
-let check_invariant_aux (lhs : Formula.t) (astral_rhs : SL.t) : bool =
-  let astral_lhs = drop_freed @@ convert lhs in
-
+let check_invariant_aux msg (lhs : SL.t) (astral_rhs : SL.t) : bool =
+  let astral_lhs = drop_freed lhs in
   let start = Unix.gettimeofday () in
   let result =
     Solver.check_entl (Option.get !solver) astral_lhs astral_rhs
   in
   cnt := !cnt + 1;
-  Config.Self.debug ~level:2 "Query (entl) %d: %f -> %b \n" !cnt
+  Config.Self.debug ~level:2 "Query (%s) %d: %f -> %b \n" msg !cnt
     (Unix.gettimeofday () -. start)
   result;
   solver_time := !solver_time +. Unix.gettimeofday () -. start;
@@ -153,20 +152,35 @@ let check_invariant_aux (lhs : Formula.t) (astral_rhs : SL.t) : bool =
       \ RHS: %a \n\
       \ RESULT: %b"
       "false"
-      Formula.pp_formula lhs SL.pp astral_lhs SL.pp
+      SL.pp lhs SL.pp astral_lhs SL.pp
       astral_rhs result;
     Async.yield ());
 
   result
 
-let check_entailment' (lhs : Formula.state) (astral_rhs : SL.t) : bool =
-  match SL.view astral_rhs with
-  | _ when SL.is_symbolic_heap astral_rhs ->
-    List.for_all (fun f -> check_invariant_aux f astral_rhs) lhs
+let check_precise lhs_list rhs =
+  let msg = "Precise invariant check" in
+  List.for_all (fun f -> check_invariant_aux msg f rhs) lhs_list
+
+let check_approx lhs_list rhs =
+  let msg = "Approximate invariant check" in
+  match SL.view rhs with
+  | _ when SL.is_symbolic_heap rhs ->
+    List.for_all (fun f ->
+      check_invariant_aux msg f rhs) lhs_list
   | Or psis when List.for_all SL.is_symbolic_heap psis ->
     List.for_all (fun l ->
       List.exists (fun r ->
-        check_invariant_aux l r
+        check_invariant_aux msg l r
       ) psis
-    ) lhs
+    ) lhs_list
   | _ -> assert false
+
+(* TODO: The strategy should be implemented directly in Astral *)
+let check_entailment' (lhs : SL.t list) (rhs : SL.t) : bool =
+  match Config.Validator.EntailmentStrategy.get () with
+  | `Precise -> check_precise lhs rhs
+  | `ApproximateOnly -> check_approx lhs rhs
+  | `TryApproximate ->
+    if check_approx lhs rhs then true
+    else check_precise lhs rhs

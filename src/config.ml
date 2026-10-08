@@ -173,6 +173,18 @@ module Validator = struct
       let file_kind = "yml"
     end)
 
+  let () = Parameter_customize.set_group group
+  module EntailmentStrategy = Self.Enum
+    (struct
+      let option_name = "-seal-validator-entailment"
+      let help = "Parse the witness only"
+      type t = [ `Precise | `TryApproximate | `ApproximateOnly]
+      let default = `TryApproximate
+      let values = [
+        (`Precise, "precise"); (`TryApproximate, "try-approx"); (`ApproximateOnly, "approx")
+      ]
+    end)
+
   let is_enabled () = not @@ Input.is_default ()
 
 end

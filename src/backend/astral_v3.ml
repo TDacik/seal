@@ -38,7 +38,7 @@ let convert_var v =
   |> SL.Term.of_var
 
 let[@warning "-8"] convert f =
-  let v = convert_var in
+  let v = SL.Term.of_var in
   let map_atom = function
     | Eq vars when List.exists (SL.Variable.equal Formula.nondet) vars -> SL.emp
     | Eq vars -> SL.mk_eq (List.map v vars)
@@ -55,7 +55,7 @@ let[@warning "-8"] convert f =
         let vars = vars |> List.map snd |> List.map v in
         let struct_def = Types.get_struct_def @@ SL.Variable.get_sort src in
         SL.mk_pto_struct (v src) struct_def vars
-    | Predicate (name, params) -> SL.mk_predicate name (List.map SL.Term.of_var params)
+    | Predicate (name, params) -> SL.mk_predicate name (List.map v params)
     | LS ls -> (
         let first = v ls.first in
         let next = v ls.next in
