@@ -16,6 +16,8 @@ module RichVar = struct
     name : string;
   }
 
+  let remove_placeholder = SL.Variable.mk "##REMOVE##" Sort.loc_nil
+
   let show_var v =
     Format.sprintf "%s (prefix: %s, anchor: %b)"
       v.name (Option.value ~default:"none" v.prefix) v.anchor
@@ -142,6 +144,14 @@ let unfold_atom = function
       |> add_atom (PointsTo (first, DLS_t (info, fresh_next, prev)))
       |> add_atom @@ mk_dls info fresh_next last first next 1
 
+  | DLS {first; next; last; prev; min_len=3; info} ->
+      let fresh1 = SL.Variable.mk (RichVar.convert @@ RichVar.mk_term first info.next_field.forig_name) SL_builtins.loc_dls in
+      let fresh2 = SL.Variable.mk (RichVar.convert @@ RichVar.mk_term fresh1 info.next_field.forig_name) SL_builtins.loc_dls in
+      []
+      |> add_atom (PointsTo (first, DLS_t (info, fresh1, prev)))
+      |> add_atom (PointsTo (fresh1, DLS_t (info, first, fresh2)))
+      |> add_atom @@ mk_dls info fresh2 last fresh1 next 1
+
   | NLS {first; next; top; min_len=2; info} ->
       let fresh_ls = SL.Variable.mk (RichVar.convert @@ RichVar.mk_term first info.down_field.forig_name) Sort.loc_ls in
       let fresh_var = SL.Variable.mk (RichVar.convert @@ RichVar.mk_term first info.top_field.forig_name) SL_builtins.loc_nls in
@@ -194,13 +204,13 @@ let rec pure_atom = function
   | _ -> assert false
 
 (* TODO: bounds *)
-let spatial_atom f = function
+let spatial_atom = function
   | Predicate _ -> failwith "TODO: generic predicate"
   | LS {first; next; info; _} ->
     let name = AbstractionHint.sll_name info in
     Some (F.sprintf "%s(%s, %s)" name (RichVar.output first) (RichVar.output next))
   (* DLS with unused last allocated node *)
-  | DLS {first; last; prev; next; info; _} when Astral_v2.is_unconstrained last f  ->
+  | DLS {first; last; prev; next; info; _} when SL.Variable.equal last RichVar.remove_placeholder ->
     let name = AbstractionHint.dll_name info in
     Some (
       Format.sprintf "%s_simple(%s, %s, %s)"
@@ -259,10 +269,10 @@ let compute_substitutions_cons = function
       [next, info.down_field]
   | _ -> []
 
-let mark_unused_param f =
+let mark_unused_params f =
   List.map (function
     | DLS {first; last; prev; next; info; min_len} when Astral_v2.is_unconstrained last f ->
-      Formula.mk_dls info first (SL.Variable.mk_fresh "#REMOVE" Sort.loc_nil) prev next min_len
+      Formula.mk_dls info first RichVar.remove_placeholder prev next min_len
     | other -> other
   ) f
 
@@ -282,10 +292,10 @@ let apply_substitution f subst =
     Formula.substitute acc ~var ~by
   ) f subst
 
-let remove_irrelevant_atoms (formula : Formula.t) (formula_aux : Formula.t) : Formula.t =
+let remove_irrelevant_atoms (formula : Formula.t) : Formula.t =
   let is_relevant_var (bound : int) (var : Formula.var) : bool =
     (not @@ Common.is_fresh_var var)
-    || Formula.count_relevant_occurences var formula_aux > bound
+    || Formula.count_relevant_occurences var formula > bound
   in
   List.filter
     (function
@@ -308,18 +318,26 @@ let normalise f =
   |> repeat_until_fixpoint (fun f ->
       let subst = compute_substitutions f in
       apply_substitution f subst)
-  |> (fun f -> remove_irrelevant_atoms f (mark_unused_param f))
+  |> mark_unused_params
+  |> (fun f -> remove_irrelevant_atoms f)
 
 let convert_formula f =
+  Config.Self.debug "In: %a" Formula.pp_formula f;
   let f' = normalise f in
+  Config.Self.debug "Phase 1: %a" Formula.pp_formula f';
   let f''=
     if List.exists Common.is_fresh_var @@ Formula.get_vars f'
     then normalise @@ A.apply @@ Simplification.reduce_equiv_classes f
     else f'
   in
-  (if List.exists Common.is_fresh_var @@ Formula.get_vars f'' then failwith "existentials");
+  Config.Self.debug "Phase 2: %a" Formula.pp_formula f'';
+  (
+    if List.exists Common.is_fresh_var @@ Formula.get_vars f''
+    then Config.Self.fatal "Cannot eliminate existential quantifiers in:\n%a"
+      Formula.pp_formula f''
+  );
   let pure_part = List.filter_map pure_atom f'' in
-  let spatial_part = List.filter_map (spatial_atom f) f'' in
+  let spatial_part = List.filter_map spatial_atom f'' in
   let permissions = List.filter_map perms_atom f'' in
   match permissions @ spatial_part, pure_part with
   | [], [] -> assert false
