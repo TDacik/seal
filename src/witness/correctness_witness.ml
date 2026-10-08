@@ -45,10 +45,10 @@ let yaml_params (name, typ) =
   ]
 
 let mk_predicate pred =
-  let open Types in
+  let open Builtin_predicates in
   `O ["predicate_definition", `O [
     "name",      `String pred.name;
-    "parameters",    `A (List.map yaml_params pred.params);
+    "parameters",  `A (List.map yaml_params pred.params);
     "definition", `String pred.definition;
     "format",     `String "ext_c_expression";
     "location",  yaml_loc pred.origin_stmt;
@@ -86,7 +86,7 @@ let mk_witness results =
     "task",           task_yaml;
   ]
   in
-  let predicates = Types.get_predicates () in
+  let predicates = Builtin_predicates.get_predicates () in
   let logic_declarations = `O [
     "entry_type", `String "predicate_definition_set";
     "metadata", metadata ();

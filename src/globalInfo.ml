@@ -2,6 +2,7 @@
 
 open Astral
 
+open Cil_types
 open Cil_datatype
 
 module SM = Map.Make(String)
