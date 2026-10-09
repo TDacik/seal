@@ -235,7 +235,7 @@ let doEdge (prev_stmt : stmt) (next_stmt : stmt) (state : t) : t =
     Kernel_function.blocks_closed_by_edge prev_stmt next_stmt
     |> List.concat_map (fun block -> block.blocals)
     |> List.filter Types.is_relevant_var
-    |> List.map Types.varinfo_to_var
+    |> List.map GlobalInfo.varinfo_to_var
   in
 
   let do_abstraction (formula : Formula.t) : Formula.state =
