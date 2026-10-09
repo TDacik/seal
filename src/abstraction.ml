@@ -54,7 +54,7 @@ let convert_to_ls (formula : Formula.t) : Formula.t =
 
 (** DLS abstraction *)
 
-let convert_to_dls (formula : Formula.t) : Formula.t =
+let convert_to_dls ?(allow_prog_var_as_last=false) (formula : Formula.t) : Formula.t =
   let atom_to_dls (atom : Formula.atom) : Formula.dls option =
     atom |> Formula.pto_to_list |> function
     | Formula.DLS dls -> Some dls
@@ -75,7 +75,7 @@ let convert_to_dls (formula : Formula.t) : Formula.t =
 
            (* Do not include program variables as last parameter of DLS. Needed
               just to produce witnesses that are easier to validate. *)
-           && Common.is_fresh_var second_dls.last
+           && (allow_prog_var_as_last || Common.is_fresh_var second_dls.last)
            (* middle vars must be fresh, and occur only in these two predicates *)
            && (SL.Variable.equal first_dls.first first_dls.last
               || is_unique_fresh first_dls.last formula)
@@ -287,6 +287,8 @@ module Tests_DLS = struct
   open DLS (* test vars with dls sort *)
 
   let () = Astral_query.init ()
+
+  let convert_to_dls = convert_to_dls ~allow_prog_var_as_last:true
 
   (* DLS abstraction *)
 
