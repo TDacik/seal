@@ -565,7 +565,9 @@ let split_by_reachability (vars : var list) (f : t) : t * t =
   in
 
   (* always include the function args and nil so that they remain in equiv classes *)
-  let reachable_vars = (nil :: vars) @ get_vars reachable_spatials in
+  let globals = List.filter GlobalInfo.is_global @@ get_vars f in
+  SL.Variable.print_list ~prefix:"glob: " globals;
+  let reachable_vars = (nil :: vars) @ globals @ get_vars reachable_spatials in
 
   let reachable_equiv_classes =
     rest |> get_equiv_classes
