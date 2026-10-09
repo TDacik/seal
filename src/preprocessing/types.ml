@@ -1,7 +1,6 @@
 open Cil
 open Cil_types
 open Astral
-open Common
 open Config
 
 (** This module implements the analysis of C types that determines, which list
@@ -134,7 +133,6 @@ let c_field_to_astral field =
 
 let c_struct_to_astral structure =
   let name = structure.cname in
-  let sort = struct_ptr_sort structure in
   let c_fields = Option.get structure.cfields in
   let fields = List.map c_field_to_astral c_fields in
   MemoryModel.StructDef.mk name fields

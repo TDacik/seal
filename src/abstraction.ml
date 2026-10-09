@@ -400,7 +400,7 @@ module Tests_DLS = struct
     let input =
       [
         mk_dls x y' nil z' 1;
-        mk_dls z w y' nil 2;
+        mk_dls z' w y' nil 2;
       ]
     in
     let expected = [ mk_dls x w nil nil 3 ] in
