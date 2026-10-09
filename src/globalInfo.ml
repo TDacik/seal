@@ -59,10 +59,17 @@ let var_to_varinfo var =
       List.nth (String.split_on_char '$' name) 1
     else name
   in
+  let name =
+    if String.contains name '!' then
+      List.nth (String.split_on_char '!' name) 0
+    else name
+  in
   try VarMap.to_varinfo name
   with Not_found ->
     SM.iter (fun s v -> Format.printf "%s -> %a\n" s Varinfo.pretty v) !VarMap.self.astral_to_c;
     Config.Self.fatal "Cannot find varinfo corresponding to %s" name
+
+let is_global var = (var_to_varinfo var).vglob
 
 let find_predicate_type_by_root root =
   let varinfo = var_to_varinfo root in
