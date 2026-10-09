@@ -173,7 +173,7 @@ let doStmt_verifier (stmt : stmt) (state : t) : t stmtaction =
       | _ -> SDefault)
   | _ -> SDefault
 
-let doStmt_validator (stmt : stmt) (state : t) : t stmtaction =
+let doStmt_validator (stmt : stmt) (orig_state : t) : t stmtaction =
   let is_first_iteration stmt =
     try (Hashtbl.find !Func_call.function_context.loop_cycles stmt) == 0
     with Not_found -> true
@@ -186,12 +186,37 @@ let doStmt_validator (stmt : stmt) (state : t) : t stmtaction =
       | None -> raise @@ Exceptions.MissingInvariant line
       | Some invariant -> invariant
     in
+    let rec invariant_add invariant f = match Astral.SL.view invariant with
+      | Or psis ->
+        Astral.SL.mk_or @@ List.map (fun psi -> invariant_add psi f) psis
+      | Exists (xs, body) -> Astral.SL.mk_exists xs @@ invariant_add body f
+      | _ -> Astral.SL.mk_star [invariant; f]
+    in
     if is_first_iteration stmt then (
-      Self.debug "Checking invariant %s" (Astral.SL.show invariant.content);
+      Self.debug "Checking invariant %s (%d) [%d]" (Astral.SL.show invariant.content) line (List.length orig_state);
+      let state = List.map Astral_query.convert orig_state in
+      let frames, rests = List.split @@ List.map (FrameInference.compute stmt) state in
+      let _ = Self.debug ">> Invariant: %s" (Astral.SL.show invariant.content) in
+      let _ = Self.debug ">> Frames: %s" (Astral.SL.show_list frames) in
+      let _ = Self.debug ">> Rests : %s" (Astral.SL.show_list rests) in
       if Astral_query.check_entailment' state invariant.content then
         let _ = Self.debug "Invariant for line %d holds on entry" line in
-        SUse (Astral2Seal.convert invariant.content)
-      else raise @@ Exceptions.NotInvariant (state, invariant)
+        let common_frame = match frames with
+          | [] -> []
+          | [x] -> [x]
+          | f :: tl ->
+            List.filter (fun atom ->
+              List.for_all (fun frame' ->
+                BatList.mem_cmp Astral.SL.compare atom (Astral.SL.get_operands frame')
+              ) tl
+            ) (Astral.SL.get_operands f)
+          in
+
+        let res = invariant_add invariant.content (Astral.SL.mk_star common_frame) in
+
+        let res = (Astral2Seal.convert res) in
+        SUse res
+      else raise @@ Exceptions.NotInvariant (orig_state, invariant)
     )
     (* Fixpoint wasn't reached using user-provided invariant *)
     else raise @@ Exceptions.NotInductive invariant
