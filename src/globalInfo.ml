@@ -69,7 +69,10 @@ let var_to_varinfo var =
     SM.iter (fun s v -> Format.printf "%s -> %a\n" s Varinfo.pretty v) !VarMap.self.astral_to_c;
     Config.Self.fatal "Cannot find varinfo corresponding to %s" name
 
-let is_global var = (var_to_varinfo var).vglob
+let is_global var =
+  if SL.Variable.is_nil var then false
+  else if Common.is_nondet_var var then false
+  else (var_to_varinfo var).vglob
 
 let find_predicate_type_by_root root =
   let varinfo = var_to_varinfo root in
