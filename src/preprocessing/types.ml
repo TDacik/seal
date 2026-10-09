@@ -192,7 +192,7 @@ let process_types =
 
 (** Generates struct definitions for generic structs and sets them in the solver*)
 let process_types (file : file) =
-  Visitor.visitFramacFileFunctions process_types file;
+  Visitor.visitFramacFile process_types file;
 
   Self.debug "Type information:";
   HT.iter (fun typ (sort, def) ->
