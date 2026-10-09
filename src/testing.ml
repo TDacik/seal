@@ -175,6 +175,7 @@ module Tests = struct
     let pto =
       SL.mk_pto_struct src_var struct_def [ field_0_var; field_1_var ]
     in
+    GlobalSID.reset (); (* TODO: this should be fixed in Astral *)
     let solver = Solver.init () |> Solver.set_heap_sort heap_sort in
     Solver.check_sat solver pto
 
@@ -185,6 +186,7 @@ module Tests = struct
     let heap_sort = HeapSort.of_list [ (sort, struct_def) ] in
     (* src |-> {field_0: dst_0, field_1: dst_1} *)
     let pto = SL.mk_pto_struct src_var struct_def [] in
+    GlobalSID.reset (); (* TODO: this should be fixed in Astral *)
     let solver = Solver.init () |> Solver.set_heap_sort heap_sort in
     Solver.check_sat solver pto
 
