@@ -41,7 +41,7 @@ let pp_typ_node fmt tnode = Cil_printer.pp_typ fmt { tnode; tattr = [] }
 
 let is_relevant_type (typ : typ) : bool =
   match Ast_types.unroll_deep_node typ with
-  | TComp _ | TPtr _ -> true
+  | TPtr _ -> true
   | _ -> false
 
 let is_relevant_var (var : varinfo) = is_relevant_type var.vtype
@@ -107,85 +107,76 @@ let type_info : (Sort.t * MemoryModel.StructDef.t) HT.t =
 
 let structures : struct_type list ref = ref []
 
+(** Create canonical sort representing pointer to the given structure. *)
+let struct_ptr_sort structure =
+  Sort.mk_loc ("Ptr_" ^ structure.cname)
+
+(** Convert C type to Astral sort. *)
+let rec c_type_to_astral typ =
+  match (Ast_types.unroll_deep typ).tnode with
+  | TInt _ -> Sort.mk_bitvector @@ Cil.bitsSizeOf typ
+  | TPtr { tnode = TComp structure; _ } -> struct_ptr_sort structure
+  | TPtr t -> Sort.mk_loc ("Ptr_" ^ Sort.name @@ c_type_to_astral t)
+  | TVoid -> Sort.mk_uninterpreted "void" (* TODO: should Astral have a void/unit sort? *)
+
+  | TFloat _ -> Common.unsupported "float type"
+  | TArray _ -> Common.unsupported "array type"
+  | TFun _ -> Common.unsupported "function pointer type"
+
+  | TNamed _ -> assert false
+  | TEnum _ | TComp _ | TBuiltin_va_list ->
+      failwith @@ Format.asprintf "%a" Cil_printer.pp_typ typ
+
 let c_field_to_astral field =
   let name = field.fname in
-  let sort = match (Ast_types.unroll field.ftype).tnode with
-  | TVoid -> Common.unsupported "void pointer"
-  | TInt _ -> Sort.mk_loc "int"
-  | TFloat _ -> Common.unsupported "float pointer"
-  | TArray _ -> Common.unsupported "array pointer"
-  | TFun _ -> Common.unsupported "function pointer"
-
-  | TPtr { tnode = TComp structure; _ } -> Sort.mk_loc structure.cname
-  | TNamed _ | TEnum _ | TPtr _ | TComp _ | TBuiltin_va_list -> assert false
-  in
+  let sort = c_type_to_astral field.ftype in
   MemoryModel.Field.mk name sort
 
 let c_struct_to_astral structure =
   let name = structure.cname in
-  let sort = Sort.mk_loc name in
+  let sort = struct_ptr_sort structure in
   let c_fields = Option.get structure.cfields in
   let fields = List.map c_field_to_astral c_fields in
-  (sort, MemoryModel.StructDef.mk name fields)
+  MemoryModel.StructDef.mk name fields
 
-let rec get_type_info (typ : typ) : Sort.t * MemoryModel.StructDef.t =
-  let typ : Cil_types.typ = Ast_types.unroll_deep typ in
-  HT.find_opt type_info typ |> function
-  | Some result -> result
-  | None ->
-      let dummy_struct_def = MemoryModel.StructDef.mk "dummy_struct_def" [] in
-      let result =
-        match typ.tnode with
-        | TPtr { tnode = TComp structure; _ } ->
-            let st = get_struct_type structure in
-            structures := st :: !structures;
-            (match st with
-            | _ when Config.Validator.is_enabled () || Config.Abstraction_mode.get () == `Synthesis -> c_struct_to_astral structure
-            | Sll _ -> (SL_builtins.loc_ls, SL_builtins.struct_ls)
-            | Dll _ -> (SL_builtins.loc_dls, SL_builtins.struct_dls)
-            | Nl _ -> (SL_builtins.loc_nls, SL_builtins.struct_nls)
-            | _ -> c_struct_to_astral structure)
-        | TPtr { tnode = TInt _; _ } ->
-            let name = "intptr" in
-            let sort = Sort.mk_loc name in
-            let struct_def = MemoryModel.StructDef.mk name [] in
-            (sort, struct_def)
-        | TPtr inner ->
-            let inner_sort = get_type_info inner |> fst in
-            let name = Format.asprintf "ptr2%s" (Sort.show inner_sort) in
-            let sort = Sort.mk_loc name in
-            let field =
-              MemoryModel.Field.mk Constants.ptr_field_name inner_sort
-            in
-            let struct_name = Format.asprintf "%s_wrapper" (Sort.show inner_sort) in
-            let struct_def = MemoryModel.StructDef.mk struct_name ~cons:(struct_name ^ "_c") [ field ] in
-            (sort, struct_def)
-        | TVoid -> (Sort.mk_uninterpreted "void", dummy_struct_def)
-        | TInt kind -> (Sort.int, dummy_struct_def)
-        | t -> (Sort.loc_nil, dummy_struct_def)
-      in
-      if snd result <> dummy_struct_def then HT.add type_info typ result;
-      result
+let c_atomic_type_to_astral_struct typ =
+  let sort = c_type_to_astral typ in
+  let field_name = Format.asprintf "%s_next" (Sort.show sort) in
+  MemoryModel.StructDef.lift_sort ~field_name sort
+
+let get_type_info typ =
+  let default_sort = c_type_to_astral typ in
+  let sort, struct_def =
+    match (Ast_types.unroll_deep typ).tnode with
+    | TPtr { tnode = TComp structure; _ } ->
+        if Config.Validator.is_enabled () || Config.Abstraction_mode.get () == `Synthesis
+        then default_sort, Option.some @@ c_struct_to_astral structure
+        else (
+          let st = get_struct_type structure in
+          structures := st :: !structures;
+          match st with
+          | Sll _ -> (SL_builtins.loc_ls, Option.Some SL_builtins.struct_ls)
+          | Dll _ -> (SL_builtins.loc_dls, Option.Some SL_builtins.struct_dls)
+          | Nl _ -> (SL_builtins.loc_nls, Option.Some SL_builtins.struct_nls)
+          | _ -> default_sort, Option.some @@ c_struct_to_astral structure)
+    | TPtr t ->
+      default_sort, Option.some @@ c_atomic_type_to_astral_struct t
+    | _ -> default_sort, None
+  in
+  let _ = match struct_def with
+  | None -> ()
+  | Some def -> HT.add type_info typ (sort, def)
+  in
+  (sort, struct_def)
 
 let get_struct_def (sort : Sort.t) : MemoryModel.StructDef.t =
-  HT.to_seq_values type_info
-  |> Seq.find (fun (s, _) -> sort = s)
-  |> Option.get |> snd
+  match Seq.find (fun (s, _) -> Sort.equal sort s) @@ HT.to_seq_values type_info with
+  | Some (_, def) -> def
+  | None -> Config.Self.abort "No structure for sort %a" Sort.pp sort
 
 let sort_of_type typ =
   try fst @@ HT.find type_info typ
   with _ -> failwith @@ Format.asprintf "No type info for '%a'" Cil_datatype.Typ.pretty typ
-
-(** Converts the type of a variable into its sort, and creates an SL variable *)
-let varinfo_to_var (varinfo : Cil_types.varinfo) : SL.Variable.t =
-  let name = Common.var_unique_name varinfo in
-  if Ast_types.is_integral varinfo.vtype then
-    SL.Variable.mk name (Sort.mk_bitvector 32)
-  else if not @@ is_relevant_var varinfo then
-    fail "invalid type in varinfo_to_var: %a" Printer.pp_varinfo varinfo
-  else
-    let sort = varinfo.vtype |> get_type_info |> fst in
-    SL.Variable.mk name sort
 
 (** Memoizes list types inside [get_type_info] *)
 let process_types =
@@ -197,41 +188,14 @@ let process_types =
       SkipChildren
   end
 
-(** TODO: experimental output of witness *)
-type pred = {
-  origin_stmt : Cil_types.location;
-  name : string;
-  params : (string * string) list;
-  definition : string;
-}
-
-let get_predicates () =
-  let fn = function
-    | Sll (compinfo, next_field) ->
-      let typ = Format.asprintf "%s *" compinfo.corig_name in
-      let name = Format.asprintf "sll_%s" compinfo.corig_name in
-      Some {
-        origin_stmt =
-          (List.hd @@ Option.get compinfo.cfields).floc;
-        name = name;
-        params = [("start", typ);("end",typ)];
-        definition =
-          Format.asprintf
-            {|(start == end) || (start != end &*& \canAccess(start, 1) &*& %s(start->%s, end))|}
-            name
-            next_field.forig_name;
-      }
-    | _ -> None
-  in
-  List.filter_map fn !structures
-
 (** Generates struct definitions for generic structs and sets them in the solver*)
 let process_types (file : file) =
   Visitor.visitFramacFileFunctions process_types file;
 
   Self.debug "Type information:";
-  HT.iter (fun typ (sort, _) ->
-    Self.debug ">  %a -> %a" Cil_printer.pp_typ typ Sort.pp sort) type_info;
+  HT.iter (fun typ (sort, def) ->
+    Self.debug ">  %a -> %a : %s"
+      Cil_printer.pp_typ typ Sort.pp sort (MemoryModel.StructDef.show def)) type_info;
 
   let heap_sort =
     HT.to_seq_values type_info |> List.of_seq |> HeapSort.of_list
