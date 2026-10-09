@@ -139,7 +139,7 @@ let c_struct_to_astral structure =
 
 let c_atomic_type_to_astral_struct typ =
   let sort = c_type_to_astral typ in
-  let field_name = Format.asprintf "%s_next" (Sort.show sort) in
+  let field_name = Format.asprintf "%s_next" (Sort.name sort) in
   MemoryModel.StructDef.lift_sort ~field_name sort
 
 let get_type_info typ =
@@ -175,6 +175,10 @@ let get_struct_def (sort : Sort.t) : MemoryModel.StructDef.t =
 let sort_of_type typ =
   try fst @@ HT.find type_info typ
   with _ -> failwith @@ Format.asprintf "No type info for '%a'" Cil_datatype.Typ.pretty typ
+
+let get_target_struct_def varinfo =
+  sort_of_type varinfo.vtype
+  |> get_struct_def
 
 (** Memoizes list types inside [get_type_info] *)
 let process_types =

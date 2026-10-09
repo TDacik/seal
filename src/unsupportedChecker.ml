@@ -24,5 +24,4 @@ let check_functions () =
   )
 
 let run () =
-  check_globals ();
   check_functions ()
