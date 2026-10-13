@@ -31,9 +31,6 @@
     uuidm
   )
   (inline_tests
-    ; this is required to run inline tests in frama-c plugin
-    ; https://git.frama-c.com/pub/frama-c/-/issues/2691
-    (libraries frama-c.init.cmdline)
     (flags (-stop-on-error))
   )
   (preprocess

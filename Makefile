@@ -34,7 +34,8 @@ FILE := $(word 2, $(MAKECMDGOALS))
 ARGS := $(wordlist 3, $(words $(MAKECMDGOALS)), $(MAKECMDGOALS))
 
 run: build
-	ivette -seal -seal-msg-key '*' -seal-svcomp-mode $(ARGS) $(FILE)
+	frama-c-gui -seal -seal-msg-key '*' -seal-svcomp-mode $(ARGS) $(FILE) 2>/dev/null
+
 
 run-cmd: build
 	frama-c -seal -seal-svcomp-mode $(ARGS) $(FILE)

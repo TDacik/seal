@@ -65,7 +65,7 @@ let rec convert_term e =
     in
     SL.Term.mk_heap_term field e
 
-  | BINARY (op, _, _) -> Config.Self.fatal "binary: %a" Cabs_debug.pp_bin_op op
+  | BINARY (op, _, _) -> Config.Self.fatal "binary: %a" Cabs.pp_binary_operator op
 
   | INDEX (_, _) -> failwith "index"
 
@@ -135,13 +135,13 @@ let rec convert e =
 
   | UNARY _ -> failwith "unary"
   | BINARY (_, e1, e2) ->
-      Config.Self.fatal "%a\n%a" Cabs_debug.pp_exp e1 Cabs_debug.pp_exp e2
+      Config.Self.fatal "%a\n%a" Cabs.pp_expression e1 Cabs.pp_expression e2
   | CAST _ -> failwith "cast"
   | PAREN e -> convert e
   | MEMBEROF _ -> failwith "memberof"
   | MEMBEROFPTR _ -> failwith "memberof_ptr"
   | _ ->
-      Config.Self.fatal "convert: %a" Cabs_debug.pp_exp e
+      Config.Self.fatal "convert: %a" Cabs.pp_expression e
 
 let get_formula = function
   | RETURN (exp, _) -> convert exp

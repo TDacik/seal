@@ -91,7 +91,7 @@ let assert_eq_state (lhs : state) (rhs : state) : bool =
 (* Default predicate infos *)
 open AbstractionHint
 
-let loc = Cil_datatype.Location.unknown
+let loc = Fileloc.unknown
 
 let sll_info =
   let compinfo =
@@ -100,7 +100,7 @@ let sll_info =
       "builtin_sll"
       (fun self ->
         let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
-        Some ["next", typ, None, [], loc]
+        Some ["next", typ, None, None, [], loc]
       )
       []
   in
@@ -114,8 +114,8 @@ let[@warning "-8"] dll_info =
       "builtin_dll"
       (fun self ->
         let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
-        Some ["next", typ, None, [], loc;
-              "prev", typ, None, [], loc]
+        Some ["next", typ, None, None, [], loc;
+              "prev", typ, None, None, [], loc]
       )
       []
   in
@@ -130,8 +130,8 @@ let[@warning "-8"] nll_info =
       (fun self ->
         let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
         let typ_down = Cil_const.mk_tptr @@ Cil_const.mk_tcomp sll_info.compinfo in
-        Some ["top", typ, None, [], loc;
-              "down", typ_down, None, [], loc]
+        Some ["top", typ, None, None, [], loc;
+              "down", typ_down, None, None, [], loc]
       )
       []
   in

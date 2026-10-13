@@ -1,6 +1,6 @@
 open Witness_common
 
-let write_witness (bug_type : Formula.bug_type) (pos : Filepath.position) =
+let write_witness (bug_type : Formula.bug_type) (pos : Filepos.t) =
   let specification =
     match bug_type with
     | Formula.Invalid_memtrack _ ->
@@ -41,7 +41,7 @@ let write_witness (bug_type : Formula.bug_type) (pos : Filepath.position) =
     \      language: C\n\
     \      specification: %s\n\
     \    uuid: %s\n"
-    filepath pos.pos_lnum time data_model filepath hash filepath specification
+    filepath (Filepos.line pos) time data_model filepath hash filepath specification
     uuid;
   close_out oc;
   let oc = open_out "witness.graphml" in

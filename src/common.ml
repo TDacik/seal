@@ -64,7 +64,7 @@ let var_unique_name (var : Cil_types.varinfo) : string =
 
 let stmt_line stmt =
   let loc = Cil_datatype.Stmt.loc stmt in
-  (fst loc).pos_lnum
+  Filepos.line (fst loc)
 
 let pretty_stmt_loc fmt stmt =
   let open Cil_types in

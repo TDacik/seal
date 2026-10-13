@@ -4,21 +4,21 @@ let formula_str f =
   SL2C.convert_state f
 
 let yaml_loc loc =
-  let pos : Filepath.position = fst loc in
+  let pos : Filepos.t = fst loc in
   `O [
-    "file_name", `String (Filepath.to_string_abs pos.pos_path);
-    "line",      `Float (Float.of_int pos.pos_lnum);
+    "file_name", `String (Filepath.to_string_abs (Filepos.path pos));
+    "line",      `Float (Float.of_int (Filepos.line pos));
     (* Frama-c does not know columns,
-       "column",    `Float (Float.of_int pos.pos_cnum);*)
+       "column",    `Float (Float.of_int (Filepos.column pos));*)
   ]
 
 let yaml_location stmt =
   let pos = fst @@ Cil_datatype.Stmt.loc stmt in
   `O [
-    "file_name", `String (Filepath.to_string_abs pos.pos_path);
-    "line",      `Float (Float.of_int pos.pos_lnum);
+    "file_name", `String (Filepath.to_string_abs (Filepos.path pos));
+    "line",      `Float (Float.of_int (Filepos.line pos));
     (* Frama-c does not know columns,
-       "column",    `Float (Float.of_int pos.pos_cnum);*)
+       "column",    `Float (Float.of_int (Filepos.column pos));*)
   ]
 
 let yaml_invariant stmt state =

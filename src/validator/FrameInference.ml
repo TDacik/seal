@@ -31,7 +31,7 @@ and modified_vars_lval (lhost, _) = match lhost with
   | Mem exp -> modified_vars_exp exp
 
 and modified_vars_exp exp = match exp.enode with
-  | Const _ | SizeOf _ | SizeOfE _ | SizeOfStr _ | AlignOf _ | AlignOfE _ -> VarSet.empty
+  | Const _ | SizeOf _ | SizeOfE _ | AlignOf _ | AlignOfE _ -> VarSet.empty
   | UnOp (_, e, _) | CastE (_, e) -> modified_vars_exp e
   | BinOp (_, e1, e2, _) -> VarSet.union (modified_vars_exp e1) (modified_vars_exp e2)
   | AddrOf lval | StartOf lval | Lval lval -> modified_vars_lval lval (* TODO: needed? *)

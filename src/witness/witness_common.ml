@@ -12,14 +12,14 @@ let get_uuid =
   fun () -> Uuidm.v4_gen state () |> Uuidm.to_string
 
 let get_data_model () =
-  match Machine.sizeof_ptr () with
+  match Machine.Sizeof.ptr () with
   | 4 -> "ILP32"
   | 8 -> "LP64"
   | _ -> Common.fail "unsupported machdep for sv-witnesses: %s" (Machine.machdep_name ())
 
 
 let get_architecture () =
-  match Machine.sizeof_ptr () with
+  match Machine.Sizeof.ptr () with
   | 4 -> "32bit"
   | 8 -> "64bit"
   | _ -> Common.fail "unsupported machdep for sv-witnesses: %s" (Machine.machdep_name ())

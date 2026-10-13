@@ -166,7 +166,7 @@ let doStmt_verifier (stmt : stmt) (state : t) : t stmtaction =
           SDefault)
   | Instr instr when Config.Svcomp_mode.get () -> (
       match instr with
-      | Call (_, { enode = Lval (Var fn, NoOffset); _ }, _, _) ->
+      | Call (_, Var fn, _, _) ->
           if List.mem fn.vname [ "reach_error"; "myexit"; "fail"; "exit" ] then
             SDone
           else SDefault

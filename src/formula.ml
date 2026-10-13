@@ -62,7 +62,7 @@ type bug_type =
   | Invalid_deref of var * t
   | Invalid_free of var * t
 
-exception Bug of bug_type * Filepath.position
+exception Bug of bug_type * Filepos.t
 
 let report_bug (bug_type : bug_type) =
   let pos, _ = Current_loc.get () in
