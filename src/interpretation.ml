@@ -114,7 +114,7 @@ let rec eval (formula : Formula.t) (exp : exp) : (Formula.t * Formula.var) list
   (* exp->field *)
   | Lval (Mem inner, Field (field, NoOffset)) ->
       eval_and_materialize inner (fun (formula, var) ->
-          if Types.is_relevant_type field.ftype then
+          if Types.is_builtin_type field.ftype then
             let var =
               Formula.get_spatial_target var
                 (Types.get_field_type field)
@@ -152,7 +152,7 @@ let set_value (lhs : lval) (rhs : Formula.var) (formula : Formula.t) :
   (* expr->field = expr; *)
   | Mem lhs, Field (lhs_field, NoOffset) ->
       eval_and_materialize lhs (fun (formula, lhs) ->
-          if Types.is_relevant_type lhs_field.ftype then
+          if Types.is_builtin_type lhs_field.ftype then
             Transfer.assign_lhs_field lhs
               (Types.get_field_type lhs_field)
               rhs formula

@@ -215,6 +215,18 @@ let sort_of_type typ =
     failwith @@ Format.asprintf "No type info for '%a'" Cil_datatype.Typ.pretty typ
     *)
 
+let is_builtin_type typ =
+  match (Ast_types.unroll_deep typ).tnode with
+  | TPtr { tnode = TComp structure; _ } ->
+    if Config.Validator.is_enabled () || not @@ Config.Abstraction_mode.is_builtin ()
+    then false
+    else (
+          let st = get_struct_type structure in
+          match st with
+          | Sll _ | Dll _ | Nl _ -> true
+          | _ -> false)
+  | _ -> false
+
 let get_target_struct_def varinfo =
   sort_of_type varinfo.vtype
   |> get_struct_def
