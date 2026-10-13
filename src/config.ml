@@ -18,15 +18,19 @@ module Dump_queries = Self.False (struct
   let help = "Dump Astral queries to 'astral_queries' directory."
 end)
 
-module Abstraction_mode = Self.Enum (struct
-  let option_name = "-seal-abstraction"
-  let help = "TODO"
+module Abstraction_mode = struct
+    include Self.Enum (struct
+    let option_name = "-seal-abstraction"
+    let help = "TODO"
 
-  type t = [`Builtin | `Synthesis]
-  let default = `Builtin
-  let values = [(`Builtin, "builtin"); (`Synthesis, "synthesis")]
+    type t = [`Builtin | `Synthesis | `None]
+    let default = `Builtin
+    let values = [(`Builtin, "builtin"); (`Synthesis, "synthesis"); (`None, "none")]
 
-end)
+  end)
+
+  let is_builtin () = get () = `Builtin
+end
 
 module Edge_abstraction = Self.False (struct
   let option_name = "-seal-edge-abstraction"
