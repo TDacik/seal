@@ -23,6 +23,15 @@ let is_fresh_var (var : SL.Variable.t) : bool =
 let is_nondet_var (var : SL.Variable.t) : bool =
   String.starts_with (SL.Variable.get_name var) ~prefix:"_nondet"
 
+let is_unknown_var (var : SL.Variable.t) : bool =
+  String.starts_with (SL.Variable.get_name var) ~prefix:"_unknown"
+
+let is_hack_var (var : SL.Variable.t) : bool =
+  String.starts_with (SL.Variable.get_name var) ~prefix:"HACK"
+
+let is_seal_var (var : SL.Variable.t) : bool =
+  is_nondet_var var || is_unknown_var var || is_hack_var var
+
 let is_anchor_var (var : SL.Variable.t) : bool =
   String.contains (SL.Variable.get_name var) '$'
 

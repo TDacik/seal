@@ -71,7 +71,7 @@ let var_to_varinfo var =
 
 let is_global var =
   if SL.Variable.is_nil var then false
-  else if Common.is_nondet_var var then false
+  else if Common.is_seal_var var then false
   else (var_to_varinfo var).vglob
 
 let find_predicate_type_by_root root =
