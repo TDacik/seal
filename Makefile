@@ -36,6 +36,9 @@ ARGS := $(wordlist 3, $(words $(MAKECMDGOALS)), $(MAKECMDGOALS))
 run: build
 	ivette -seal -seal-msg-key '*' -seal-svcomp-mode $(ARGS) $(FILE)
 
+run-cmd: build
+	frama-c -seal -seal-svcomp-mode $(ARGS) $(FILE)
+
 build:
 	dune build && dune install
 
