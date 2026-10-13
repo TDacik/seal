@@ -72,10 +72,10 @@ let func_call (args : Formula.var list) (func : varinfo) (formula : Formula.t)
   let return_stmt = Kernel_function.find_return func in
 
   let params =
-    Kernel_function.get_formals func |> List.map Types.varinfo_to_var
+    Kernel_function.get_formals func |> List.map GlobalInfo.varinfo_to_var
   in
   let locals =
-    params @ (Kernel_function.get_locals func |> List.map Types.varinfo_to_var)
+    params @ (Kernel_function.get_locals func |> List.map GlobalInfo.varinfo_to_var)
   in
 
   let reachable, unreachable = Formula.split_by_reachability args formula in
@@ -93,7 +93,7 @@ let func_call (args : Formula.var list) (func : varinfo) (formula : Formula.t)
     let return_var =
       match return_stmt.skind with
       | Return (Some { enode = Lval (Var var, NoOffset); _ }, _) ->
-          SL.Variable.mk var.vname lhs_sort
+          SL.Variable.mk (Common.var_unique_name var) lhs_sort
       | _ -> SL.Variable.mk "dummy" Sort.loc_nil
     in
     ( result

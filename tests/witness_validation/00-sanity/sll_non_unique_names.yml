@@ -1,0 +1,73 @@
+# Expected: valid
+# Description: non-unique names of local variables
+
+- entry_type: predicate_definition_set
+  metadata:
+    format_version: "2.2"
+    uuid: 6f5d7b7e-725b-43e0-9e83-2fc019f515e0
+    creation_time: 2026-09-21T10:44:25Z
+    producer:
+      name: Crafted
+      version: "0.1"
+    task:
+      input_files:
+      - ./sll_non_unique_names.c
+      input_file_hashes:
+        ./sll_non_unique_names.c: 3b0f2023709a4cf6447dbc29c0872b45cdf70c90f32ca1f8e952f3af35051aab
+      specification: G valid-free && G valid-deref && G valid-memtrack
+      data_model: ILP32
+      language: C
+  content:
+  - predicate_definition:
+      name: sll
+      parameters:
+      - name: start
+        type: struct sll *
+      - name: end
+        type: struct sll *
+      definition:
+          (start == end)
+            || (start != end &&
+                \separated(\canAccess(start, 4), sll(start->next, end)))
+      format: ext_c_expression
+      location:
+        file_name: ./sll_non_unique_names.c
+        line: 7
+- entry_type: invariant_set
+  metadata:
+    format_version: "2.2"
+    uuid: 6b614e6f-44da-4363-bb04-cfe128009c42
+    creation_time: 2026-09-21T10:44:25Z
+    producer:
+      name: Crafted
+      version: "0.1"
+    task:
+      input_files:
+      - ./sll_non_unique_names.c
+      input_file_hashes:
+        ./sll_non_unique_names.c: 3b0f2023709a4cf6447dbc29c0872b45cdf70c90f32ca1f8e952f3af35051aab
+      specification: G valid-free && G valid-deref && G valid-memtrack
+      data_model: ILP32
+      language: C
+  content:
+  - invariant:
+      type: loop_memory_invariant
+      location:
+        file_name: ./sll_non_unique_names.c
+        line: 15
+      value: "sll(head, NULL)"
+      format: ext_c_expression
+  - invariant:
+      type: loop_memory_invariant
+      location:
+        file_name: ./sll_non_unique_names.c
+        line: 27
+      value: "\\separated(sll(\\at(list, Pre), list), sll(list, NULL))"
+      format: ext_c_expression
+  - invariant:
+      type: loop_memory_invariant
+      location:
+        file_name: ./sll_non_unique_names.c
+        line: 36
+      value: "sll(list, NULL)"
+      format: ext_c_expression

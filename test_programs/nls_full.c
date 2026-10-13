@@ -14,7 +14,7 @@ typedef struct NL {
 void construct_list(NL *s) {
     int __VERIFIER_nondet_int();
     while (__VERIFIER_nondet_int()) {
-        s->top = malloc(1);
+        s->top = malloc(sizeof(NL));
         if (s->top == NULL) {
             return;
         }
@@ -43,7 +43,7 @@ void free_list(NL *s) {
 }
 
 int main() {
-    NL *start = malloc(1);
+    NL *start = malloc(sizeof(NL));
     if (start == NULL) {
         return 1;
     }
@@ -53,9 +53,9 @@ int main() {
     traverse_list(start);
     free_list(start);
 
-    start = malloc(1);
+    start = malloc(sizeof(NL));
     if (start == NULL) {
-        return NULL;
+        return 1;
     }
     start->next = NULL;
 

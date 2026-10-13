@@ -1,0 +1,195 @@
+(** Yaml witness format parser. *)
+
+open Astral
+
+open CorrectnessWitness
+
+let path_ref = ref ""
+
+let fail msg =
+  Format.printf "%s" msg;
+  exit 1
+
+let yaml_to_string yaml =
+  match Yaml.to_string yaml with
+  | Ok str -> str
+  | Error (`Msg msg) -> Format.sprintf "<error> (%s)" msg
+
+let get_string = function
+  | `String str -> str
+  | _ -> fail "expecting string"
+
+let find ?default key yaml_object =
+  match Yaml.Util.find key yaml_object, default with
+  | Ok (Some res), _ -> res
+  | Ok None, Some default -> default
+  | Ok None, None -> fail @@ Format.asprintf "Key '%s' is missing in:\n %s" key (yaml_to_string yaml_object)
+  | Error (`Msg msg), _ -> failwith ("Yaml parser error: " ^ msg)
+
+let find_string ?default key yaml_object =
+  let default = Option.map (fun b -> `String b) default in
+  match find ?default key yaml_object with
+  | `String str -> str
+  | _ -> fail "expecting string"
+
+let find_int key yaml_object =
+  match find key yaml_object with
+  | `Float f when Float.is_integer f -> Float.to_int f
+  | _ -> fail "expecting int"
+
+let find_bool ?default key yaml_object =
+  let default = Option.map (fun b -> `Bool b) default in
+  match find ?default key yaml_object with
+  | `Bool b -> b
+  | _ -> fail "expecting bool"
+
+let find_list ?(empty_default=false) elem_fn key yaml_object =
+  let default = if empty_default then Some (`A []) else None in
+  match find ?default key yaml_object with
+  | `A xs -> List.map elem_fn xs
+  | _ -> fail "expecting bool"
+
+let is_entry_type entry_type yaml_object =
+  match Yaml.Util.find "entry_type" yaml_object with
+  | Ok (Some `String str) -> String.equal str entry_type
+  | _ -> false
+
+let find_entry ?default entry_type entries =
+  try List.find (is_entry_type entry_type) entries
+  with Not_found ->
+    match default with
+    | None -> failwith ("No entry with type: " ^ entry_type)
+    | Some default -> default
+
+
+(** High-level get functions *)
+
+let get_location yaml =
+  let loc = find "location" yaml in
+  let prefix = Filepath.dirname (Filepath.of_string !path_ref) in
+  let file =
+    find_string "file_name" loc
+    |> Filepath.concat prefix
+    |> Filepath.to_string
+  in
+  let line = find_int "line" loc in
+  (file, line)
+
+(** *)
+
+let sort_of_c_type str =
+  let open Logic_typing in
+  (* TODO: non pointers *)
+  assert (String.ends_with ~suffix:"*" str);
+  (* TODO: typedefs proper handling *)
+  let ctype =
+    if String.starts_with ~prefix:"struct " str then
+      let name = String.split_on_char ' ' str |> List.tl |> List.hd in
+      Globals.Types.find_type Struct name
+    else
+      let name = String.split_on_char ' ' str |> List.hd in
+      Globals.Types.find_type Typedef name
+  in
+  Types.sort_of_type @@ Cil_const.mk_tptr ctype
+
+let parse_definition = ()
+
+
+(** *)
+
+let find_struct name =
+  let name = List.nth (String.split_on_char ' ' name) 1 in
+  try Globals.Types.find_type Logic_typing.Struct name
+  with _ -> failwith ("No structure: " ^ name)
+
+
+let get_types params =
+  List.filter_map (function `O [_, _; "type", `String typ] -> Some typ | _ -> None) params
+  |> List.sort_uniq String.compare
+  |> List.map find_struct
+
+let parse_param = function
+  | `O ["name", `String name; "type", `String typ] ->
+    let sort = sort_of_c_type typ in
+    SL.Variable.mk name sort
+  | _ -> failwith "TODO"
+
+let parse_params = function
+  | `A ps ->
+    let params = List.map parse_param ps in
+    let types = get_types ps in
+    types, params
+  | _ -> failwith "TODO"
+
+let parse_predicate = function
+  | `O ["predicate_definition", decl] ->
+    let name = find_string "name" decl in
+    let _, params = parse_params @@ find "parameters" decl in
+    let definition = ExprParser.parse ("none", 0) params @@ find_string "definition" decl in
+    InductiveDefinition.mk name params definition
+  | `O _ -> failwith "TODO"
+  | _ -> failwith "Expecting object in declaration"
+
+let parse_predicates = function
+  | `A decls -> List.map parse_predicate decls
+  | _ -> failwith "Expecting list of declarations in `content`"
+
+let parse_logic_declarations yaml = match yaml with
+  | `O [] -> []
+  | `O _ ->
+    begin match Yaml.Util.find "content" yaml with
+    | Ok (Some content) -> parse_predicates content
+    | Ok (None) -> failwith "Missing content of predicate_definition_set"
+    | Error (`Msg msg) -> failwith ("Yaml parser error: " ^ msg)
+    end
+  | _ -> failwith "Expecting object `predicate_definition_set`"
+
+(** {2 Parsing of invariants} *)
+
+let parse_invariant = function
+  | `O [_, invariant] ->
+    let file, line = get_location invariant in
+    let value = find_string "value" invariant in
+    let labels = find_list ~empty_default:true (get_string) "labels" invariant in
+    let invariant = Invariant.{
+      location = line;
+      raw_content = value;
+      should_be_inductive = List.mem "inductive" labels;
+      content = ExprParser.parse (file, line) [] value;
+    }
+    in
+    (line, invariant)
+  | _ -> assert false
+
+let parse_invariants = function
+  | `A invariants ->
+    List.map parse_invariant invariants
+    |> InvariantMap.of_list
+  | _ -> failwith "Expecting object list of invariants"
+
+let parse_invariant_set yaml = match yaml with
+  | `O _ ->
+    begin match Yaml.Util.find "content" yaml with
+    | Ok (Some content) -> parse_invariants content
+    | Ok (None) -> failwith "Missing content invariant_set"
+    | Error (`Msg msg) -> failwith ("Yaml parser error: " ^ msg)
+    end
+  | _ -> failwith "Expecting object `invariant_set`"
+
+let parse_yaml = function
+  | `A entries ->
+    let predicates = find_entry ~default:(`O []) "predicate_definition_set" entries in
+    let invariants = find_entry ~default:(`O []) "invariant_set" entries in
+    {
+      predicates = parse_logic_declarations predicates;
+      invariants = parse_invariant_set invariants
+    }
+  | _ -> failwith "Toplevel error"
+
+let parse path =
+  path_ref := path;
+  let module IC = In_channel in
+  let text = IC.with_open_text path IC.input_all in
+  match Yaml.of_string text with
+    | Ok yaml -> parse_yaml yaml
+    | Error (`Msg msg) -> failwith ("Yaml parser error: " ^ msg)

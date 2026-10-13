@@ -1,0 +1,27 @@
+# Expected: valid
+# Description: equality of pointers to integers
+
+- entry_type: invariant_set
+  metadata:
+    format_version: "2.2"
+    uuid: 8c044c6f-ca2d-4dbb-a7d3-9798501e7603
+    creation_time: 2026-09-21T13:05:15Z
+    producer:
+      name: Crafted
+      version: "0.1"
+    task:
+      input_files:
+      - ./int_ptr_equal.c
+      input_file_hashes:
+        ./int_ptr_equal.c: c0ef7bb47f5458432a4e97a17a2f26b872fdedbeae94af6c8ee76cf4631df648
+      specification: G valid-free && G valid-deref && G valid-memtrack
+      data_model: ILP32
+      language: C
+  content:
+  - invariant:
+      type: loop_memory_invariant
+      location:
+        file_name: ./int_ptr_equal.c
+        line: 12
+      value: "a == b"
+      format: ext_c_expression

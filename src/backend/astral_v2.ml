@@ -5,9 +5,12 @@ open Formula
 
 (** TODO: do not used SID directly *)
 let init ~backend ~encoding ~dump_queries () =
-  GlobalSID.register_user_defined ls;
-  GlobalSID.register_user_defined dls;
-  GlobalSID.register_user_defined nls;
+  if not @@ Config.Validator.is_enabled () && Config.Abstraction_mode.get () == `Builtin then (
+    GlobalSID.register_user_defined @@ ls ();
+    GlobalSID.register_user_defined @@ dls ();
+    GlobalSID.register_user_defined @@ dls_simple ();
+    GlobalSID.register_user_defined @@ nls ();
+  );
   Freed.register ();
 
   let open SL_builtins in
@@ -23,21 +26,27 @@ let init ~backend ~encoding ~dump_queries () =
     ~use_builtin_defs:false ~source:"seal" ()
   |> Solver.add_heap_sort heap_sort
 
+let is_unconstrained var formula =
+  Common.is_fresh_var var
+  && Formula.count_relevant_occurences var formula == 1
+
 let[@warning "-8"] convert f =
   let v = SL.Term.of_var in
   let map_atom = function
+    | Eq vars when List.exists (SL.Variable.equal Formula.nondet) vars -> SL.emp
     | Eq vars -> SL.mk_eq (List.map v vars)
     | Distinct (lhs, rhs) -> SL.mk_distinct2 (v lhs) (v rhs)
     | Freed var -> SL_builtins.mk_freed (v var)
-    | PointsTo (src, LS_t next) -> SL_builtins.mk_pto_ls (v src) ~next:(v next)
-    | PointsTo (src, DLS_t (next, prev)) ->
+    | PointsTo (src, LS_t (_, next)) -> SL_builtins.mk_pto_ls (v src) ~next:(v next)
+    | PointsTo (src, DLS_t (_, next, prev)) ->
         SL_builtins.mk_pto_dls (v src) ~next:(v next) ~prev:(v prev)
-    | PointsTo (src, NLS_t (top, next)) ->
+    | PointsTo (src, NLS_t (_, top, next)) ->
         SL_builtins.mk_pto_nls (v src) ~top:(v top) ~next:(v next)
     | PointsTo (src, Generic vars) ->
         let vars = vars |> List.map snd |> List.map v in
         let struct_def = Types.get_struct_def @@ SL.Variable.get_sort src in
         SL.mk_pto_struct (v src) struct_def vars
+    | Predicate (name, xs) -> SL.mk_predicate name @@ List.map v xs
     | LS ls -> (
         let first = v ls.first in
         let next = v ls.next in
@@ -56,6 +65,32 @@ let[@warning "-8"] convert f =
           (* ) *)
         in
         match ls.min_len with 0 -> ls_0 | 1 -> ls_1 | _ -> ls_2)
+    | DLS dls when is_unconstrained dls.last f -> (
+      (* When the last allocated location in DLS is unconstrained, we
+         may use simplified definition of DLS to simplify the formula. *)
+      let first = v dls.first in
+      let prev = v dls.prev in
+      let next = v dls.next in
+
+      let dls_0 = SL.mk_predicate "dls_simple" [ first; next; prev ] in
+      let dls_1 = SL.mk_star [ dls_0; SL.mk_distinct2 first next ] in
+      let dls_2 =
+          let n = SL.Term.mk_fresh_var "n" loc_dls in
+          SL.mk_star
+            [
+              SL_builtins.mk_pto_dls first ~next:n ~prev;
+              SL.mk_predicate "dls_simple" [ n; next; first ];
+              SL.mk_distinct2 n next;
+              SL.mk_distinct2 first next;
+            ]
+        in
+
+        match dls.min_len with
+        | 0 -> dls_0
+        | 1 -> dls_1
+        | 2 -> dls_2
+        | _ -> dls_2 (* TODO: dls_3+ is probably useless here *)
+      )
     | DLS dls -> (
         let first = v dls.first in
         let last = v dls.last in

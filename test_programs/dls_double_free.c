@@ -10,7 +10,7 @@ typedef struct DLL {
 
 void construct_list(DLL *s) {
     while (__VERIFIER_nondet_int()) {
-        DLL *next = malloc(1);
+        DLL *next = malloc(sizeof(DLL));
         if (next == NULL) {
             s->next = NULL;
             return;
@@ -40,18 +40,18 @@ void free_list(DLL *s) {
 }
 
 int main() {
-    DLL *start = malloc(1);
+    DLL *start = malloc(sizeof(DLL));
     if (start == NULL) {
-        return NULL;
+        return 0;
     }
 
     construct_list(start);
     traverse_list(start);
     free_list(start);
 
-    start = malloc(1);
+    start = malloc(sizeof(DLL));
     if (start == NULL) {
-        return NULL;
+        return 0;
     }
 
     construct_list(start);

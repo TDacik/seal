@@ -1,73 +1,24 @@
-open Config
-open Dataflow2
-open Astral
 open Common
 
-(** This module is the entrypoint of the analysis, it runs the preprocessing and
-    the dataflow analysis itself *)
+(* Common entrypoint of verifier and validator. *)
+let main () =
+  Printexc.record_backtrace true;
 
-module ForwardsAnalysis = Forwards (Analysis)
-
-let run_analysis () =
-  Func_call.compute_function := ForwardsAnalysis.compute;
+  UnsupportedChecker.run ();
 
   (* initialize the solver instance *)
   Astral_query.init ();
 
-  (* run the preprocessing passes *)
-  Preprocessing.preprocess ();
+  if Config.Validator.is_enabled ()
+  then Validator.validate @@ Config.Validator.Input.get ()
+  else Verifier.verify ();
 
-  let main, _ = Globals.entry_point () in
-  let first_stmt = Kernel_function.find_first_stmt main in
-
-  (* set [emp] as the initial state for the analysis *)
-  Hashtbl.add !Func_call.function_context.results first_stmt [ [] ];
-
-  (* run the dataflow analysis *)
-  ForwardsAnalysis.compute [ first_stmt ];
-
-  (* check if there are any allocations left after the main function *)
-  let return_stmt = Kernel_function.find_return main in
-  let final_state =
-    Hashtbl.find !Func_call.function_context.results return_stmt
-  in
-  List.iter
-    (fun formula ->
-      Formula.get_spatial_atoms formula |> function
-      | atom :: _ -> Formula.report_bug (Invalid_memtrack (atom, formula))
-      | _ -> ())
-    final_state;
-
-  Self.result "Successful_verification"
-
-let main () =
-  Printexc.record_backtrace true;
-
-  (* run the analysis and catch exceptions representing bug detections *)
-  (try run_analysis ()
-   with e -> (
-     let backtrace = Printexc.get_backtrace () in
-     Common.warning "BACKTRACE: \n%s" backtrace;
-
-     if !Analysis.unknown_condition_reached then Self.result "Unknown_result";
-
-     match e with
-     | Formula.Bug (bug_type, pos) ->
-         if Config.Svcomp_mode.get () then Witness.write_witness bug_type pos;
-         (* print the type of detected bug *)
-         Self.result ~source:pos "%a" Formula.pp_bug_type bug_type
-     | e ->
-         Common.warning "EXCEPTION: %s" (Printexc.to_string e);
-         if not @@ Config.Catch_exceptions.get () then raise e));
-
-  (* dump analysis results *)
-  Solver.dump_stats (Option.get !solver);
-  Func_call.merge_all_results ();
-  Self.result "Astral time: %.2f" !Astral_query.solver_time
+  Astral.Solver.dump_stats (Option.get !solver);
+  Config.Self.result "Astral time: %.2f" !Astral_query.solver_time
 
 (* register the analysis entrypoint into Frama-C  *)
 let () =
   Boot.Main.extend (function
-    | _ when Print_version.get () -> print_endline "0.1"
-    | _ when Enable_analysis.get () -> main ()
+    | _ when Config.Print_version.get () -> print_endline "0.1"
+    | _ when Config.Enable_analysis.get () -> main ()
     | _ -> ())

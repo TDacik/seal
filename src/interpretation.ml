@@ -1,8 +1,11 @@
 open Cil_types
 open Common
+
+module A = Abstraction
+
 open Astral
 
-let var = Types.varinfo_to_var
+let var = GlobalInfo.varinfo_to_var
 
 let eval_binop (op : binop) (lhs : Formula.var) (rhs : Formula.var)
     (formula : Formula.t) : Formula.t * Formula.var =
@@ -48,7 +51,7 @@ let rec eval (formula : Formula.t) (exp : exp) : (Formula.t * Formula.var) list
     let materialized =
       List.concat_map
         (fun (formula, var) ->
-          Formula.materialize var formula |> List.map (fun f -> (f, var)))
+          Transfer.materialize var formula |> List.map (fun f -> (f, var)))
         inputs
     in
     List.map fn materialized
@@ -134,7 +137,7 @@ let set_value (lhs : lval) (rhs : Formula.var) (formula : Formula.t) :
     let materialized =
       List.concat_map
         (fun (formula, var) ->
-          Formula.materialize var formula |> List.map (fun f -> (f, var)))
+          Transfer.materialize var formula |> List.map (fun f -> (f, var)))
         inputs
     in
     List.map fn materialized
@@ -206,9 +209,9 @@ let interpret_instr (instr : instr) (formula : Formula.t) : Formula.t list =
       (* evaluate function call on all (formula * arguments) tuples *)
       let formulas, return_vars =
         List.concat_map
-          (fun (formula, args) ->
+          (fun (formula, input) ->
             let formulas, return_vars =
-              Transfer.call lhs_sort func (List.rev args) formula
+              Transfer.call lhs_sort lhs_option func (List.rev input) (List.rev args) formula
             in
             List.combine formulas return_vars)
           inputs

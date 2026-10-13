@@ -1,0 +1,27 @@
+# Expected: valid
+# Description: equality of integers
+
+- entry_type: invariant_set
+  metadata:
+    format_version: "2.2"
+    uuid: 235362e1-702d-46b4-8bfd-f1ca9a9f4572
+    creation_time: 2026-09-21T13:09:07Z
+    producer:
+      name: Crafted
+      version: "0.1"
+    task:
+      input_files:
+      - ./int_equal.c
+      input_file_hashes:
+        ./int_equal.c: 26201349699cfec8406e02870564ce0194b38c938aa951718955a96d5dd77b8b
+      specification: G valid-free && G valid-deref && G valid-memtrack
+      data_model: ILP32
+      language: C
+  content:
+  - invariant:
+      type: loop_memory_invariant
+      location:
+        file_name: ./int_equal.c
+        line: 12
+      value: a == b
+      format: ext_c_expression

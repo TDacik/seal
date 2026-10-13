@@ -50,8 +50,26 @@ module DLS = struct
   let z' = SL.Variable.mk "z!" SL_builtins.loc_dls
 end
 
+(* NLS sort vars *)
+module NLS = struct
+  let u = SL.Variable.mk "u" SL_builtins.loc_nls
+  let v = SL.Variable.mk "v" SL_builtins.loc_nls
+  let w = SL.Variable.mk "w" SL_builtins.loc_nls
+  let x = SL.Variable.mk "x" SL_builtins.loc_nls
+  let y = SL.Variable.mk "y" SL_builtins.loc_nls
+  let z = SL.Variable.mk "z" SL_builtins.loc_nls
+
+  (* fresh vars *)
+  let u' = SL.Variable.mk "u'" SL_builtins.loc_nls
+  let v' = SL.Variable.mk "v!" SL_builtins.loc_nls
+  let w' = SL.Variable.mk "w!" SL_builtins.loc_nls
+  let x' = SL.Variable.mk "x!" SL_builtins.loc_nls
+  let y' = SL.Variable.mk "y!" SL_builtins.loc_nls
+  let z' = SL.Variable.mk "z!" SL_builtins.loc_nls
+end
+
 let assert_eq (lhs : t) (rhs : t) : bool =
-  if canonicalize lhs = canonicalize rhs then true
+  if Formula.equal (canonicalize lhs) (canonicalize rhs) then true
   else (
     print_warn_nl "Formulas do not match:";
     print_warn "RESULT: ";
@@ -61,7 +79,7 @@ let assert_eq (lhs : t) (rhs : t) : bool =
     false)
 
 let assert_eq_state (lhs : state) (rhs : state) : bool =
-  if canonicalize_state lhs = canonicalize_state rhs then true
+  if Formula.equal_state (canonicalize_state lhs) (canonicalize_state rhs) then true
   else (
     print_warn_nl "States do not match:";
     print_warn "RESULT: ";
@@ -70,18 +88,76 @@ let assert_eq_state (lhs : state) (rhs : state) : bool =
     show_state rhs;
     false)
 
+(* Default predicate infos *)
+open AbstractionHint
+
+let loc = Cil_datatype.Location.unknown
+
+let sll_info =
+  let compinfo =
+    Cil_const.mkCompInfo
+      true
+      "builtin_sll"
+      (fun self ->
+        let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
+        Some ["next", typ, None, [], loc]
+      )
+      []
+  in
+  let next_field = List.hd @@ Option.get compinfo.cfields in
+  {compinfo; next_field}
+
+let[@warning "-8"] dll_info =
+  let compinfo =
+    Cil_const.mkCompInfo
+      true
+      "builtin_dll"
+      (fun self ->
+        let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
+        Some ["next", typ, None, [], loc;
+              "prev", typ, None, [], loc]
+      )
+      []
+  in
+  let [next_field; prev_field] = Option.get compinfo.cfields in
+  {compinfo; next_field; prev_field}
+
+let[@warning "-8"] nll_info =
+  let compinfo =
+    Cil_const.mkCompInfo
+      true
+      "builtin_nll"
+      (fun self ->
+        let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
+        let typ_down = Cil_const.mk_tptr @@ Cil_const.mk_tcomp sll_info.compinfo in
+        Some ["top", typ, None, [], loc;
+              "down", typ_down, None, [], loc]
+      )
+      []
+  in
+  let [top_field; down_field] = Option.get compinfo.cfields in
+  {compinfo; top_field; down_field; sll_info}
+
+let mk_ls = Formula.mk_ls sll_info
+let mk_dls = Formula.mk_dls dll_info
+let mk_nls = Formula.mk_nls nll_info
+
+let mk_pto_ls = Formula.mk_pto_ls sll_info
+let mk_pto_dls = Formula.mk_pto_dls dll_info
+let mk_pto_nls = Formula.mk_pto_nls nll_info
+
 (* tests for Formula cannot be in the Formula module due to circular dependency *)
 module Tests = struct
   (* we want the bounds sorted [1+, 2+, 3+, ...] so that during deduplication
      the lowest possible bound is picked first *)
   let%test "compare_bounds" =
     let input = [ [ mk_ls x y 1 ]; [ mk_ls x y 2 ] ] in
-    input |> List.sort compare_bounds = input
+    Formula.equal_state (List.sort compare_bounds input) input
 
   let%test "compare_bounds_2" =
     let input = [ [ mk_dls z y u' v' 3 ]; [ mk_dls x y u v 2 ] ] in
     let expected = [ [ mk_dls x y u v 2 ]; [ mk_dls z y u' v' 3 ] ] in
-    input |> List.sort compare_bounds = expected
+    Formula.equal_state (List.sort compare_bounds input) expected
 
   let%test "sl struct creation" =
     let sort = Sort.mk_loc "struct_name" in
@@ -99,6 +175,7 @@ module Tests = struct
     let pto =
       SL.mk_pto_struct src_var struct_def [ field_0_var; field_1_var ]
     in
+    GlobalSID.reset (); (* TODO: this should be fixed in Astral *)
     let solver = Solver.init () |> Solver.set_heap_sort heap_sort in
     Solver.check_sat solver pto
 
@@ -109,6 +186,7 @@ module Tests = struct
     let heap_sort = HeapSort.of_list [ (sort, struct_def) ] in
     (* src |-> {field_0: dst_0, field_1: dst_1} *)
     let pto = SL.mk_pto_struct src_var struct_def [] in
+    GlobalSID.reset (); (* TODO: this should be fixed in Astral *)
     let solver = Solver.init () |> Solver.set_heap_sort heap_sort in
     Solver.check_sat solver pto
 

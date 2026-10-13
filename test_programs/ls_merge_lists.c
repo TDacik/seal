@@ -8,7 +8,7 @@ typedef struct List {
 void construct_list(SLL *s) {
     int __VERIFIER_nondet_int();
     while (__VERIFIER_nondet_int()) {
-        s->next = malloc(1);
+        s->next = malloc(sizeof(SLL));
         if (s->next == NULL) {
             return;
         }
@@ -38,15 +38,15 @@ void free_list(SLL *s) {
 }
 
 int main() {
-    SLL *first = malloc(1);
+    SLL *first = malloc(sizeof(SLL));
     if (first == NULL) {
-        return NULL;
+        return 0;
     }
     construct_list(first);
 
-    SLL *second = malloc(1);
+    SLL *second = malloc(sizeof(SLL));
     if (second == NULL) {
-        return NULL;
+        return 0;
     }
     construct_list(second);
 

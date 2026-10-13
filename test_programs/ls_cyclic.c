@@ -6,7 +6,7 @@ typedef struct SLL {
 } SLL;
 
 SLL *construct_list() {
-    SLL *start = malloc(1);
+    SLL *start = malloc(sizeof(SLL));
     if (start == NULL) {
         return NULL;
     }
@@ -15,7 +15,7 @@ SLL *construct_list() {
 
     int __VERIFIER_nondet_int();
     while (__VERIFIER_nondet_int()) {
-        node->next = malloc(1);
+        node->next = malloc(sizeof(SLL));
         if (node->next == NULL) {
             break;
         }

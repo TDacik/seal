@@ -1,0 +1,115 @@
+open Witness_common
+
+let formula_str f =
+  SL2C.convert_state f
+
+let yaml_loc loc =
+  let pos : Filepath.position = fst loc in
+  `O [
+    "file_name", `String (Filepath.to_string_abs pos.pos_path);
+    "line",      `Float (Float.of_int pos.pos_lnum);
+    (* Frama-c does not know columns,
+       "column",    `Float (Float.of_int pos.pos_cnum);*)
+  ]
+
+let yaml_location stmt =
+  let pos = fst @@ Cil_datatype.Stmt.loc stmt in
+  `O [
+    "file_name", `String (Filepath.to_string_abs pos.pos_path);
+    "line",      `Float (Float.of_int pos.pos_lnum);
+    (* Frama-c does not know columns,
+       "column",    `Float (Float.of_int pos.pos_cnum);*)
+  ]
+
+let yaml_invariant stmt state =
+  `O ["invariant", `O [
+    "type",     `String "loop_memory_invariant";
+    "location", yaml_location stmt;
+    "value",    `String (SL2C.convert_state state);
+    "format",   `String "ext_c_expression";
+  ]]
+
+
+let mk_invariants (results : Formula.state Invariants.H.t) =
+  Invariants.H.to_seq results
+  |> List.of_seq
+  |> List.filter_map (fun (stmt, state) ->
+      if Common.is_loop stmt then Some (yaml_invariant stmt state)
+      else None
+    )
+
+let yaml_params (name, typ) =
+  `O [
+    "name",     `String name;
+    "type",     `String typ;
+  ]
+
+let mk_predicate pred =
+  let open Builtin_predicates in
+  `O ["predicate_definition", `O [
+    "name",      `String pred.name;
+    "parameters",  `A (List.map yaml_params pred.params);
+    "definition", `String pred.definition;
+    "format",     `String "ext_c_expression";
+    "location",  yaml_loc pred.origin_stmt;
+  ]]
+
+let mk_predicates predicates = List.map mk_predicate predicates
+
+let mk_witness results =
+  let specification = "G valid-free && G valid-deref && G valid-memtrack" in
+
+  let data_model = get_data_model () in
+  let files = get_files_with_hashes () in
+
+  let task_yaml = `O [
+    "input_files",        `A (List.map (fun (path, _) -> `String path) files);
+    "input_file_hashes",  `O (List.map (fun (path, hash) -> (path, `String hash)) files);
+    "specification",      `String specification;
+    "data_model",         `String data_model;
+    "language",           `String "C";
+  ]
+  in
+
+  (* TODO: do not hardcore name and version here *)
+  let producer_yaml = `O [
+    "name",     `String "SEAL";
+    "version",  `String "0.1";
+  ]
+  in
+
+  let metadata () = `O [
+    "format_version", `String "2.2";
+    "uuid",           `String (get_uuid ());
+    "creation_time",  `String (current_time ());
+    "producer",       producer_yaml;
+    "task",           task_yaml;
+  ]
+  in
+  let predicates = Builtin_predicates.get_predicates () in
+  let logic_declarations = `O [
+    "entry_type", `String "predicate_definition_set";
+    "metadata", metadata ();
+    "content",    `A (mk_predicates predicates);
+  ]
+  in
+
+  let invariant_set = `O [
+    "entry_type", `String "invariant_set";
+    "metadata", metadata ();
+    "content",  `A (mk_invariants results);
+  ] in
+
+  if List.is_empty predicates
+  then `A [invariant_set]
+  else `A [logic_declarations; invariant_set]
+
+let write results path =
+  let witness = mk_witness results in
+  let channel = Out_channel.open_text path in
+  match Yaml.to_string witness with
+  | Ok yaml ->
+    Out_channel.output_string channel yaml;
+    close_out channel
+  | Error (`Msg err) ->
+    Common.fail "Internal error when generating witness: %s" err

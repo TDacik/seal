@@ -13,7 +13,7 @@ type t = Formula.state
 
 let copy state = state
 let pretty fmt state = Formula.pp_state fmt state
-let var = Types.varinfo_to_var
+let var = GlobalInfo.varinfo_to_var
 
 (** this is the transfer function for instructions, we take the instr and
     previous state, and create new state *)
@@ -33,31 +33,13 @@ let doInstr _ (instr : instr) (prev_state : t) : t =
 
 let computeFirstPredecessor _ state = state
 
-(** Removes formulas that are covered by other formulas using entailment *)
-let deduplicate_formulas (state : t) : t =
-  let is_covered current to_keep =
-    if Config.Simple_join.get () then
-      List.exists
-        (fun formula_to_keep ->
-          Astral_query.check_entailment [ current ] [ formula_to_keep ])
-        to_keep
-    else Astral_query.check_entailment [ current ] to_keep
-  in
-
-  state
-  |> List.sort Formula.compare_bounds
-  |> List.fold_left
-       (fun to_keep current ->
-         if is_covered current to_keep then to_keep else current :: to_keep)
-       []
-
 (** Iterate through all formulas of new_state [phi], and each one that doesn't
     satisfy (phi => old) has to be added to [old]. If old is not changed, None
     is returned. *)
 let combinePredecessors _ ~old:(old_state : t) (new_state : t) : t option =
   Async.yield ();
 
-  let joined_state = deduplicate_formulas @@ new_state @ old_state in
+  let joined_state = Simplification.deduplicate_formulas @@ new_state @ old_state in
 
   let state_changed joined_state old_state =
     if Config.Simple_join.get () then
@@ -135,6 +117,8 @@ let doGuard _ (condition : exp) (state : t) : t guardaction * t guardaction =
   let th = List.filter Astral_query.check_sat th in
   let el = List.filter Astral_query.check_sat el in
 
+  if List.is_empty th && List.is_empty el then failwith "Both branches dead" else ();
+
   Self.debug ~current:true ~dkey:Printing.do_guard
     "state:\n%athen branch:\n%aelse branch:\n%a" Formula.pp_state state
     Formula.pp_state th Formula.pp_state el;
@@ -158,10 +142,11 @@ let get_inner_loops (block : block) =
   !loops
 
 (** Decides whether to stop the analysis *)
-let doStmt (stmt : stmt) (_ : t) : t stmtaction =
+let doStmt_verifier (stmt : stmt) (state : t) : t stmtaction =
   let loop_cycles = !Func_call.function_context.loop_cycles in
+  Invariants.add stmt state;
   match stmt.skind with
-  (* stop when reaching the maximum number of loop 
+  (* stop when reaching the maximum number of loop
       iterations in underapproximation mode *)
   | Loop (_, block, _, _, _) when Config.Max_loop_cycles.is_set () -> (
       match Hashtbl.find_opt loop_cycles stmt with
@@ -188,6 +173,60 @@ let doStmt (stmt : stmt) (_ : t) : t stmtaction =
       | _ -> SDefault)
   | _ -> SDefault
 
+let doStmt_validator (stmt : stmt) (orig_state : t) : t stmtaction =
+  let is_first_iteration stmt =
+    try (Hashtbl.find !Func_call.function_context.loop_cycles stmt) == 0
+    with Not_found -> true
+  in
+  match stmt.skind with
+  | Loop _ ->
+    let line = Common.stmt_line stmt in
+    let invariant =
+      match GlobalWitness.get_loop_invariant stmt with
+      | None -> raise @@ Exceptions.MissingInvariant line
+      | Some invariant -> invariant
+    in
+    let rec invariant_add invariant f = match Astral.SL.view invariant with
+      | Or psis ->
+        Astral.SL.mk_or @@ List.map (fun psi -> invariant_add psi f) psis
+      | Exists (xs, body) -> Astral.SL.mk_exists xs @@ invariant_add body f
+      | _ -> Astral.SL.mk_star [invariant; f]
+    in
+    if is_first_iteration stmt then (
+      Self.debug "Checking invariant %s (%d) [%d]" (Astral.SL.show invariant.content) line (List.length orig_state);
+      let state = List.map Astral_query.convert orig_state in
+      let frames, rests = List.split @@ List.map (FrameInference.compute stmt) state in
+      let _ = Self.debug ">> Invariant: %s" (Astral.SL.show invariant.content) in
+      let _ = Self.debug ">> Frames: %s" (Astral.SL.show_list frames) in
+      let _ = Self.debug ">> Rests : %s" (Astral.SL.show_list rests) in
+      if Astral_query.check_entailment' state invariant.content then
+        let _ = Self.debug "Invariant for line %d holds on entry" line in
+        let common_frame = match frames with
+          | [] -> []
+          | [x] -> [x]
+          | f :: tl ->
+            List.filter (fun atom ->
+              List.for_all (fun frame' ->
+                BatList.mem_cmp Astral.SL.compare atom (Astral.SL.get_operands frame')
+              ) tl
+            ) (Astral.SL.get_operands f)
+          in
+
+        let res = invariant_add invariant.content (Astral.SL.mk_star common_frame) in
+
+        let res = (Astral2Seal.convert res) in
+        SUse res
+      else raise @@ Exceptions.NotInvariant (orig_state, invariant)
+    )
+    (* Fixpoint wasn't reached using user-provided invariant *)
+    else raise @@ Exceptions.NotInductive invariant
+  | _ -> SDefault
+
+let doStmt (stmt : stmt) (state : t) : t stmtaction =
+  if Config.Validator.is_enabled ()
+  then doStmt_validator stmt state
+  else doStmt_verifier stmt state
+
 (* Simplify and deduplicate formulas *)
 let doEdge (prev_stmt : stmt) (next_stmt : stmt) (state : t) : t =
   Async.yield ();
@@ -196,22 +235,24 @@ let doEdge (prev_stmt : stmt) (next_stmt : stmt) (state : t) : t =
     Kernel_function.blocks_closed_by_edge prev_stmt next_stmt
     |> List.concat_map (fun block -> block.blocals)
     |> List.filter Types.is_relevant_var
-    |> List.map Types.varinfo_to_var
+    |> List.map GlobalInfo.varinfo_to_var
   in
 
-  let do_abstraction (formula : Formula.t) : Formula.t =
+  let do_abstraction (formula : Formula.t) : Formula.state =
     match next_stmt.skind with
     | _ when Config.Edge_abstraction.get () ->
         formula |> Abstraction.convert_to_ls |> Abstraction.convert_to_dls
         |> Abstraction.convert_to_nls
+        |> (fun x -> [x])
     | Loop _ ->
         formula |> Abstraction.convert_to_ls |> Abstraction.convert_to_dls
         |> Abstraction.convert_to_nls
-    | _ -> formula
+        |> (fun x -> [x])
+    | _ -> [formula]
   in
 
   let deduplicate_states : t -> t =
-    if Config.Edge_deduplication.get () then deduplicate_formulas else Fun.id
+    if Config.Edge_deduplication.get () then Simplification.deduplicate_formulas else Fun.id
   in
 
   let open Simplification in
@@ -220,7 +261,7 @@ let doEdge (prev_stmt : stmt) (next_stmt : stmt) (state : t) : t =
     |> List.map (convert_vars_to_fresh end_of_scope_locals)
     |> List.map remove_leaks
     |> List.map reduce_equiv_classes
-    |> List.map do_abstraction
+    |> List.concat_map do_abstraction
     |> List.map remove_irrelevant_atoms
     |> List.map remove_empty_lists
     |> Formula.canonicalize_state ~rename_fresh:false
@@ -250,32 +291,4 @@ module StmtStartData = struct
   let add stmt = Hashtbl.add !Func_call.function_context.results stmt
   let iter f = Hashtbl.iter f !Func_call.function_context.results
   let length () = Hashtbl.length !Func_call.function_context.results
-end
-
-module Tests = struct
-  open Testing
-
-  let%test "atom_deduplication" =
-    let input = [ Distinct (x, y); Distinct (x, y); Distinct (x, y) ] in
-    let expected = [ Distinct (x, y) ] in
-    assert_eq (List.sort_uniq compare input) expected
-
-  let%test "join_1" =
-    let input = [ [ PointsTo (x, LS_t y') ]; [ PointsTo (x, LS_t z') ] ] in
-    let expected = [ [ PointsTo (x, LS_t y') ] ] in
-    let joined = deduplicate_formulas input in
-    assert_eq_state joined expected
-
-  let%test "join_2" =
-    let input = [ [ PointsTo (x, LS_t y) ]; [ PointsTo (x, LS_t z) ] ] in
-    let joined = deduplicate_formulas input in
-    assert_eq_state joined input
-
-  let%test "join_ls" =
-    List.init 3 Fun.id
-    |> List.for_all (fun len ->
-           let input = [ [ mk_ls x y' len ]; [ mk_ls x z' len ] ] in
-           let expected = [ [ mk_ls x y' len ] ] in
-           let joined = deduplicate_formulas input in
-           assert_eq_state joined expected)
 end
