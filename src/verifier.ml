@@ -37,19 +37,38 @@ let compute_initial_state () =
   let open MemoryModel in
   let is_var_pointer var = Ast_types.is_ptr var.vtype in
   Globals.Vars.fold (fun var init acc ->
-    if is_var_pointer var && not @@ is_frama_c_builtin var
+    if is_var_pointer var && var.vreferenced && not @@ is_frama_c_builtin var
     then
       let v = GlobalInfo.varinfo_to_var var in
       match init.init with
       | None ->
           Formula.Eq [v; SL.Variable.nil] :: acc
-      | Some (SingleInit _)
-      | Some (CompoundInit _) -> failwith "TODO"
+      | Some (SingleInit exp) ->
+          let formula', value  =
+            match Interpretation.eval acc exp with
+            | [x] -> x
+            | _ -> assert false
+          in
+          Formula.Eq [v; value] :: formula'
+      | Some (CompoundInit _) ->
+        Config.Self.not_yet_implemented "TODO: compound init of %a" Cil_datatype.Varinfo.pretty var
       (*
       let struct_def = Types.get_target_struct_def var in
       let fields = StructDef.get_fields struct_def in
       let target = List.map (fun f -> (Field.show f, SL.Variable.nil)) fields in
       Formula.PointsTo (GlobalInfo.varinfo_to_var var, Generic target) :: acc*)
+    else if Ast_types.is_integral var.vtype && not @@ is_frama_c_builtin var then
+      let v = GlobalInfo.varinfo_to_var var in
+      match init.init with
+      | None -> Formula.IntEq (v, 0) :: acc
+      | Some (SingleInit exp) ->
+          let formula', value  =
+            match Interpretation.eval acc exp with
+            | [x] -> x
+            | _ -> assert false
+          in
+          Formula.Eq [v; value] :: formula'
+      | _ -> failwith "TODO: int"
     else acc
   ) []
 
@@ -63,7 +82,9 @@ let run_analysis () =
   let first_stmt = Kernel_function.find_first_stmt main in
 
   (* set [emp] as the initial state for the analysis *)
-  Hashtbl.add !Func_call.function_context.results first_stmt [ compute_initial_state () ];
+  let init = compute_initial_state () in
+  Self.debug "Initial state of globals:\n  %a" Formula.pp_formula init;
+  Hashtbl.add !Func_call.function_context.results first_stmt [ init ];
 
   (* run the dataflow analysis *)
   ForwardsAnalysis.compute [ first_stmt ];
