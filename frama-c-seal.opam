@@ -30,5 +30,5 @@ build: [
   ["dune" "install" "-p" name "--create-install-files" name]
 ]
 pin-depends: [
-  ["astral.dev" "git+https://github.com/TDacik/Astral.git#dev"]
+  ["astral.dev" "git+https://github.com/TDacik/Astral.git#dev-stable"]
 ]
