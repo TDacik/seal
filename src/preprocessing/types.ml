@@ -40,6 +40,7 @@ let pp_typ_node fmt tnode = Cil_printer.pp_typ fmt { tnode; tattr = [] }
 
 let is_relevant_type (typ : typ) : bool =
   match Ast_types.unroll_deep_node typ with
+  | TPtr {tnode = TFun _; _} -> false
   | TPtr _ -> true
   | _ -> false
 
@@ -76,7 +77,7 @@ and get_struct_type (compinfo : compinfo) : struct_type =
 
   match (self_pointers, sll_pointers) with
   | _ when (Config.Validator.is_enabled ())
-      || Config.Abstraction_mode.get () == `Synthesis -> Struct compinfo
+      || not @@ Config.Abstraction_mode.is_builtin () -> Struct compinfo
   | [next_field], [] -> Sll {compinfo; next_field}
   | [top_field], [(down_field, sll_info)] -> Nl {compinfo; top_field; down_field; sll_info}
   | [next_field; prev_field], [] -> Dll {compinfo; next_field; prev_field}
@@ -87,8 +88,8 @@ let get_field_type (field : fieldinfo) : field_type =
   let self_pointers, sll_pointers = get_self_and_sll_fields field.fcomp in
 
   match (self_pointers, sll_pointers) with
-  | _ when (Config.Validator.is_enabled ())
-      || Config.Abstraction_mode.get () == `Synthesis ->
+  | _ when (Config.Validator.is_enabled ()
+      || not @@ Config.Abstraction_mode.is_builtin ()) ->
         Other field.fname
   | [ next ], [] when field.forder = next.forder -> Next
   (* DLL *)
@@ -100,6 +101,8 @@ let get_field_type (field : fieldinfo) : field_type =
   | _ -> if is_relevant_type field.ftype then Other field.fname else Data
 
 module HT = Cil_datatype.Typ.Hashtbl
+
+exception Skip
 
 let type_info : (Sort.t * MemoryModel.StructDef.t) HT.t =
   HT.create 113
@@ -114,17 +117,28 @@ let struct_ptr_sort structure =
 let rec c_type_to_astral typ =
   match (Ast_types.unroll_deep typ).tnode with
   | TInt _ -> Sort.mk_bitvector @@ Cil.bitsSizeOf typ
-  | TPtr { tnode = TComp structure; _ } -> struct_ptr_sort structure
+  | TPtr { tnode = TComp structure; _ } -> (
+    match get_struct_type structure with
+    | Sll _ -> SL_builtins.loc_ls
+    | Dll _ -> SL_builtins.loc_dls
+    | Nl _ -> SL_builtins.loc_nls
+    | _ -> struct_ptr_sort structure)
   | TPtr t -> Sort.mk_loc ("Ptr_" ^ Sort.name @@ c_type_to_astral t)
   | TVoid -> Sort.mk_uninterpreted "void" (* TODO: should Astral have a void/unit sort? *)
 
   | TFloat _ -> Common.unsupported "float type"
-  | TArray _ -> Common.unsupported "array type"
-  | TFun _ -> Common.unsupported "function pointer type"
+  | TArray _ -> Common.unsupported "array type: %a" Cil_printer.pp_typ typ
+  | TFun _ -> raise Skip
 
   | TNamed _ -> assert false
-  | TEnum _ | TComp _ | TBuiltin_va_list ->
-      failwith @@ Format.asprintf "%a" Cil_printer.pp_typ typ
+  | TEnum _ ->
+      Config.Self.abort "Enum: %a" Cil_printer.pp_typ typ
+  | TComp _ ->
+      if Cil.isCompleteType typ
+      then Config.Self.abort "Comp: %a" Cil_printer.pp_typ typ
+      else raise Skip
+  | TBuiltin_va_list ->
+      Config.Self.abort "Builtin_va_list: %a" Cil_printer.pp_typ typ
 
 let c_field_to_astral field =
   let name = field.fname in
@@ -132,10 +146,15 @@ let c_field_to_astral field =
   MemoryModel.Field.mk name sort
 
 let c_struct_to_astral structure =
-  let name = structure.cname in
-  let c_fields = Option.get structure.cfields in
-  let fields = List.map c_field_to_astral c_fields in
-  MemoryModel.StructDef.mk name fields
+  match get_struct_type structure with
+  | Sll _ -> SL_builtins.struct_ls
+  | Dll _ -> SL_builtins.struct_dls
+  | Nl _ -> SL_builtins.struct_nls
+  | _ ->
+    let name = structure.cname in
+    let c_fields = Option.get structure.cfields in
+    let fields = List.map c_field_to_astral c_fields in
+    MemoryModel.StructDef.mk name fields
 
 let c_atomic_type_to_astral_struct typ =
   let sort = c_type_to_astral typ in
@@ -147,7 +166,7 @@ let get_type_info typ =
   let sort, struct_def =
     match (Ast_types.unroll_deep typ).tnode with
     | TPtr { tnode = TComp structure; _ } ->
-        if Config.Validator.is_enabled () || Config.Abstraction_mode.get () == `Synthesis
+        if Config.Validator.is_enabled () || not @@ Config.Abstraction_mode.is_builtin ()
         then default_sort, Option.some @@ c_struct_to_astral structure
         else (
           let st = get_struct_type structure in
@@ -163,35 +182,65 @@ let get_type_info typ =
   in
   let _ = match struct_def with
   | None -> ()
-  | Some def -> HT.add type_info typ (sort, def)
+  | Some def ->
+      let heap_sort = HeapSort.of_list [(sort, def)] in
+      Common.solver := Some (Solver.add_heap_sort heap_sort (Option.get !Common.solver));
+
+      HT.add type_info typ (sort, def)
   in
   (sort, struct_def)
 
 let get_struct_def (sort : Sort.t) : MemoryModel.StructDef.t =
+  Self.debug "Type information:";
+  HT.iter (fun typ (sort, def) ->
+    Self.debug ">  %a -> %a : %s"
+      Cil_printer.pp_typ typ Sort.pp sort (MemoryModel.StructDef.show def)) type_info;
   match Seq.find (fun (s, _) -> Sort.equal sort s) @@ HT.to_seq_values type_info with
   | Some (_, def) -> def
   | None -> Config.Self.abort "No structure for sort %a" Sort.pp sort
 
 let sort_of_type typ =
+  Self.feedback "Calling sort of type";
   try fst @@ HT.find type_info typ
-  with _ -> failwith @@ Format.asprintf "No type info for '%a'" Cil_datatype.Typ.pretty typ
+  with _ ->
+    let sort, def = get_type_info typ in
+    match def with
+    | None -> sort
+    | Some def ->
+      let heap_sort = HeapSort.of_list [(sort, def)] in
+      Self.feedback "Updating heap sort";
+      Common.solver := Some (Solver.add_heap_sort heap_sort (Option.get !Common.solver));
+      sort
+    (*
+    failwith @@ Format.asprintf "No type info for '%a'" Cil_datatype.Typ.pretty typ
+    *)
 
 let get_target_struct_def varinfo =
   sort_of_type varinfo.vtype
   |> get_struct_def
+
+let visit_aux typ =
+  Self.debug "Visiting type %a" Cil_printer.pp_typ typ;
+  try
+    if is_relevant_type typ then ignore @@ get_type_info typ;
+    SkipChildren
+  with Skip -> SkipChildren
 
 (** Memoizes list types inside [get_type_info] *)
 let process_types =
   object
     inherit Visitor.frama_c_inplace
 
-    method! vtype (typ : typ) =
-      if is_relevant_type typ then ignore @@ get_type_info typ;
-      SkipChildren
+    method! vvrbl (var : varinfo) = visit_aux var.vtype
+
+    (*method! vvdec (var : varinfo) = visit_aux var.vtype*)
+
+
   end
 
 (** Generates struct definitions for generic structs and sets them in the solver*)
-let process_types (file : file) =
+let process_types (file : file) = ()
+  (*
   Visitor.visitFramacFile process_types file;
 
   Self.debug "Type information:";
@@ -204,3 +253,4 @@ let process_types (file : file) =
   in
   Common.solver :=
     Some (Solver.add_heap_sort heap_sort (Option.get !Common.solver))
+    *)
