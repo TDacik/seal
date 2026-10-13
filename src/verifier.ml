@@ -10,7 +10,10 @@ module ForwardsAnalysis = Forwards (Analysis)
 let check_memcleanup main =
   let return_stmt = Kernel_function.find_return main in
   let final_state =
-    Hashtbl.find !Func_call.function_context.results return_stmt
+    try Hashtbl.find !Func_call.function_context.results return_stmt
+    with Not_found ->
+      (* Return is unreachable *)
+      []
   in
   List.iter
     (fun formula ->
