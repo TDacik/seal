@@ -7,6 +7,7 @@ let write_witness (bug_type : Formula.bug_type) (pos : Filepath.position) =
         "CHECK( init(main()), LTL(G valid-memtrack) )"
     | Formula.Invalid_deref _ -> "CHECK( init(main()), LTL(G valid-deref) )"
     | Formula.Invalid_free _ -> "CHECK( init(main()), LTL(G valid-free) )"
+    | Formula.Assertion_failure -> "CHECK( init(main()), LTL(G ! call(reach_error())) )"
   in
 
   let uuid = get_uuid () in

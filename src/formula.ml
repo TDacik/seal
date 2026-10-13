@@ -61,6 +61,7 @@ type bug_type =
   | Invalid_memtrack of atom * t
   | Invalid_deref of var * t
   | Invalid_free of var * t
+  | Assertion_failure
 
 exception Bug of bug_type * Filepath.position
 
@@ -179,6 +180,7 @@ let pp_bug_type (fmt : Format.formatter) (bug_type : bug_type) =
   | Invalid_free (var, f) ->
       Format.fprintf fmt "Invalid_free: var '%a' in formula '%a'" SL.Variable.pp
         var pp_formula f
+  | Assertion_failure -> Format.fprintf fmt "Assertion failed"
 
 (** Variables *)
 

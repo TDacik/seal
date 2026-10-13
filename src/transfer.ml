@@ -213,6 +213,9 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
       | Formula.Bug (Invalid_deref (var, formula), pos) ->
           raise @@ Formula.Bug (Invalid_free (var, formula), pos)
       | e -> raise e)
+  | "reach_error", _, _ ->
+      let pos, _ = Current_loc.get () in
+      raise @@ Formula.Bug (Assertion_failure, pos)
   | "__VERIFIER_nondet_int", _, _ -> ([ formula ], [ Formula.nondet ])
   | "__VERIFIER_print_state", _,  _ ->
       Config.Self.result ~current:true "\027[36m%a\027[0m" Formula.pp_formula formula;
