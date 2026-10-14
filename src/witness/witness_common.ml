@@ -15,19 +15,23 @@ let get_data_model () =
   match Machine.Sizeof.ptr () with
   | 4 -> "ILP32"
   | 8 -> "LP64"
-  | _ -> Common.fail "unsupported machdep for sv-witnesses: %s" (Machine.machdep_name ())
-
+  | _ ->
+      Common.fail "unsupported machdep for sv-witnesses: %s"
+        (Machine.machdep_name ())
 
 let get_architecture () =
   match Machine.Sizeof.ptr () with
   | 4 -> "32bit"
   | 8 -> "64bit"
-  | _ -> Common.fail "unsupported machdep for sv-witnesses: %s" (Machine.machdep_name ())
+  | _ ->
+      Common.fail "unsupported machdep for sv-witnesses: %s"
+        (Machine.machdep_name ())
 
 let get_files_with_hashes () =
   let open File in
   let f file =
-    let path = match file with
+    let path =
+      match file with
       | NeedCPP (path, _, _, _) -> path
       | NoCPP path -> path
       | External (path, _) -> path

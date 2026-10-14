@@ -1,8 +1,6 @@
 open Cil_types
 open Common
-
 module A = Abstraction
-
 open Astral
 
 let var = GlobalInfo.varinfo_to_var
@@ -211,7 +209,8 @@ let interpret_instr (instr : instr) (formula : Formula.t) : Formula.t list =
         List.concat_map
           (fun (formula, input) ->
             let formulas, return_vars =
-              Transfer.call lhs_sort lhs_option func (List.rev input) (List.rev args) formula
+              Transfer.call lhs_sort lhs_option func (List.rev input)
+                (List.rev args) formula
             in
             List.combine formulas return_vars)
           inputs

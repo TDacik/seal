@@ -58,7 +58,8 @@ let get_unique_name (name : string) : string =
 let var_unique_name (var : Cil_types.varinfo) : string =
   let open Cil_types in
   if var.vglob then var.vname
-  else match Kernel_function.find_defining_kf var with
+  else
+    match Kernel_function.find_defining_kf var with
     | Some kf -> Format.asprintf "%a#%s" Kernel_function.pretty kf var.vname
     | None -> assert false
 
@@ -69,7 +70,8 @@ let stmt_line stmt =
 let pretty_stmt_loc fmt stmt =
   let open Cil_types in
   let open Cil_datatype in
-  let stmt_short = match stmt.skind with
+  let stmt_short =
+    match stmt.skind with
     | If _ -> "if"
     | Switch _ -> "switch"
     | Loop _ -> "loop"

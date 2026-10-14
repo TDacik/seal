@@ -1,5 +1,4 @@
 open Astral
-
 open Config
 open Common
 
@@ -15,7 +14,8 @@ type ls = {
   first : SL.Variable.t;
   next : SL.Variable.t;
   min_len : Int.t;
-} [@@deriving compare, equal]
+}
+[@@deriving compare, equal]
 
 type dls = {
   info : dll_info;
@@ -24,22 +24,24 @@ type dls = {
   prev : SL.Variable.t;
   next : SL.Variable.t;
   min_len : Int.t;
-} [@@deriving compare, equal]
+}
+[@@deriving compare, equal]
 
 type nls = {
   info : nll_info;
   first : SL.Variable.t;
   top : SL.Variable.t;
   next : SL.Variable.t;
-  min_len : Int.t
-} [@@deriving compare, equal]
+  min_len : Int.t;
+}
+[@@deriving compare, equal]
 
 type pto_target =
   | LS_t of sll_info * SL.Variable.t
   | DLS_t of dll_info * SL.Variable.t * SL.Variable.t
   | NLS_t of nll_info * SL.Variable.t * SL.Variable.t
   | Generic of (String.t * SL.Variable.t) List.t
-  [@@deriving compare, equal]
+[@@deriving compare, equal]
 
 type atom =
   | Eq of SL.Variable.t List.t
@@ -52,7 +54,7 @@ type atom =
   | Predicate of String.t * SL.Variable.t List.t
   | IntEq of SL.Variable.t * Int.t
   | Ref of SL.Variable.t * SL.Variable.t
-  [@@deriving compare, equal]
+[@@deriving compare, equal]
 
 type t = atom List.t [@@deriving compare, equal]
 
@@ -68,7 +70,6 @@ let report_bug (bug_type : bug_type) =
   let pos, _ = Current_loc.get () in
   raise @@ Bug (bug_type, pos)
 
-
 (* state stored by each CFG node in dataflow analysis *)
 type state = t List.t [@@deriving compare, equal]
 
@@ -81,20 +82,18 @@ let nondet = SL.Variable.mk "_nondet" int_sort
 
 (** Constructors *)
 
-let mk_pto_ls info source next =
-  PointsTo (source, (LS_t (info, next)))
+let mk_pto_ls info source next = PointsTo (source, LS_t (info, next))
 
 let mk_pto_dls info source next prev =
-  PointsTo (source, (DLS_t (info, next, prev)))
+  PointsTo (source, DLS_t (info, next, prev))
 
-let mk_pto_nls info source top next =
-  PointsTo (source, (NLS_t (info, top, next)))
+let mk_pto_nls info source top next = PointsTo (source, NLS_t (info, top, next))
 
 let mk_ls info (first : var) (next : var) (min_len : int) =
   LS { info; first; next; min_len }
 
-let mk_dls info (first : var) (last : var) (prev : var) (next : var) (min_len : int)
-    =
+let mk_dls info (first : var) (last : var) (prev : var) (next : var)
+    (min_len : int) =
   DLS { info; first; last; prev; next; min_len }
 
 let mk_nls info (first : var) (top : var) (next : var) (min_len : int) =
@@ -114,7 +113,8 @@ let atom_to_string : atom -> 'a =
       vars |> List.map v |> String.concat " = " |> Format.sprintf "(%s)"
   | Distinct (lhs, rhs) -> Format.sprintf "(%s != %s)" (v lhs) (v rhs)
   | Freed var -> "freed(" ^ v var ^ ")"
-  | PointsTo (src, LS_t (_, next)) -> Format.sprintf "(%s -> %s)" (v src) (v next)
+  | PointsTo (src, LS_t (_, next)) ->
+      Format.sprintf "(%s -> %s)" (v src) (v next)
   | PointsTo (src, DLS_t (_, next, prev)) ->
       Format.sprintf "(%s -> n:%s,p:%s)" (v src) (v next) (v prev)
   | PointsTo (src, NLS_t (_, top, next)) ->
@@ -122,7 +122,7 @@ let atom_to_string : atom -> 'a =
   | PointsTo (src, Generic target) ->
       Format.sprintf "(%s -> {%s})" (v src)
         (target
-        |> List.map (fun (field, var) -> Format.sprintf "%s:%s" (field) (v var))
+        |> List.map (fun (field, var) -> Format.sprintf "%s:%s" field (v var))
         |> String.concat " ")
   | LS ls -> Format.sprintf "ls_%d+(%s,%s)" ls.min_len (v ls.first) (v ls.next)
   | DLS dls ->
@@ -139,8 +139,7 @@ let atom_to_string : atom -> 'a =
 let pp_pto_target fmt target =
   let pp_var = SL.Variable.pp in
   match target with
-  | LS_t (_, next) ->
-      Format.fprintf fmt "LS(next: %a)" pp_var next
+  | LS_t (_, next) -> Format.fprintf fmt "LS(next: %a)" pp_var next
   | DLS_t (_, next, prev) ->
       Format.fprintf fmt "DLS(next: %a, prev: %a)" pp_var next pp_var prev
   | NLS_t (_, top, next) ->
@@ -213,25 +212,23 @@ let subsitute_in_atom (old_var : var) (new_var : var) : atom -> atom =
   | PointsTo (src, LS_t (info, next)) -> PointsTo (v src, LS_t (info, v next))
   | PointsTo (src, DLS_t (info, next, prev)) ->
       PointsTo (v src, DLS_t (info, v next, v prev))
-  | PointsTo (src, NLS_t (info, top, next)) -> PointsTo (v src, NLS_t (info, v top, v next))
+  | PointsTo (src, NLS_t (info, top, next)) ->
+      PointsTo (v src, NLS_t (info, v top, v next))
   | PointsTo (src, Generic target) ->
-      PointsTo (v src, Generic (target |> List.map (fun (name, var) -> (name, v var))))
-  | LS ls -> LS {ls with first = v ls.first; next = v ls.next}
+      PointsTo
+        (v src, Generic (target |> List.map (fun (name, var) -> (name, v var))))
+  | LS ls -> LS { ls with first = v ls.first; next = v ls.next }
   | DLS dls ->
       DLS
-        {dls with
+        {
+          dls with
           first = v dls.first;
           last = v dls.last;
           prev = v dls.prev;
           next = v dls.next;
         }
   | NLS nls ->
-      NLS
-        {nls with
-          first = v nls.first;
-          top = v nls.top;
-          next = v nls.next;
-        }
+      NLS { nls with first = v nls.first; top = v nls.top; next = v nls.next }
   | Predicate (name, params) -> Predicate (name, List.map v params)
   | IntEq (lhs, value) -> IntEq (v lhs, value)
   | Ref (src, target) -> Ref (v src, v target)
@@ -263,7 +260,9 @@ let standardize_fresh_var_names (f : t) : t =
 (** Atoms *)
 
 let add_atom (atom : atom) (f : t) : t = atom :: f
-let remove_atom (atom : atom) (f : t) : t = BatList.remove_if (equal_atom atom) f
+
+let remove_atom (atom : atom) (f : t) : t =
+  BatList.remove_if (equal_atom atom) f
 
 (** Equivalence classes *)
 
@@ -271,8 +270,9 @@ let get_equiv_classes : t -> var list list =
   List.filter_map (function Eq list -> Some list | _ -> None)
 
 let find_equiv_class (var : var) (f : t) : var list option =
-  f |> get_equiv_classes |> List.filter (List.mem var)
-  |> function [] -> None | xs -> Some (SL.Variable.MonoList.unique @@ List.concat xs)
+  f |> get_equiv_classes |> List.filter (List.mem var) |> function
+  | [] -> None
+  | xs -> Some (SL.Variable.MonoList.unique @@ List.concat xs)
 
 let map_equiv_classes (fn : var list -> var list) : t -> t =
   List.map (function Eq vars -> Eq (fn vars) | other -> other)
@@ -303,7 +303,8 @@ let is_spatial_source (src : var) : atom -> bool = function
   | LS ls -> ls.first = src
   | DLS dls -> dls.first = src || dls.last = src
   | NLS nls -> nls.first = src
-  | Predicate (_, x :: _) -> SL.Variable.equal x src (* TODO: make sure that x is always root *)
+  | Predicate (_, x :: _) ->
+      SL.Variable.equal x src (* TODO: make sure that x is always root *)
   | _ -> false
 
 let is_spatial_source_first (src : var) : atom -> bool = function
@@ -311,7 +312,8 @@ let is_spatial_source_first (src : var) : atom -> bool = function
   | LS ls -> ls.first = src
   | DLS dls -> dls.first = src
   | NLS nls -> nls.first = src
-  | Predicate (_, x :: _) -> SL.Variable.equal x src (* TODO: make sure that x is always root *)
+  | Predicate (_, x :: _) ->
+      SL.Variable.equal x src (* TODO: make sure that x is always root *)
   | _ -> false
 
 let make_var_explicit_src (var : var) (f : t) : t =
@@ -332,10 +334,11 @@ let make_var_explicit_src (var : var) (f : t) : t =
 
 let get_spatial_atom_from_opt (src : var) (f : t) : atom option =
   match find_equiv_class src f with
-  | None ->
-    List.find_opt (fun atom -> is_spatial_source src atom) f
+  | None -> List.find_opt (fun atom -> is_spatial_source src atom) f
   | Some cls ->
-    List.find_opt (fun atom -> List.exists (fun v -> is_spatial_source v atom) cls) f
+      List.find_opt
+        (fun atom -> List.exists (fun v -> is_spatial_source v atom) cls)
+        f
 
 let get_spatial_atom_from_first_opt (src : var) (f : t) : atom option =
   f |> make_var_explicit_src src |> List.find_opt (is_spatial_source_first src)
@@ -407,14 +410,14 @@ let change_pto_target (src : var) (field : Types.field_type) (new_target : var)
     | Prev, DLS_t (info, next, _) -> DLS_t (info, next, new_target)
     | Top, NLS_t (info, _, next) -> NLS_t (info, new_target, next)
     | Other field, Generic vars ->
-        Generic (List.map (fun ((field', _) as old) ->
-          if String.equal field field' then (field', new_target)
-          else old
-        ) vars)
+        Generic
+          (List.map
+             (fun ((field', _) as old) ->
+               if String.equal field field' then (field', new_target) else old)
+             vars)
     | field, old_struct ->
-      Self.abort "Field %a is not compatible with struct %a"
-        Types.pp_field_type field
-        pp_pto_target old_struct
+        Self.abort "Field %a is not compatible with struct %a"
+          Types.pp_field_type field pp_pto_target old_struct
   in
   f |> remove_spatial_from src |> add_atom (PointsTo (src, new_struct))
 
@@ -429,11 +432,11 @@ let assert_allocated (var : var) (f : t) : unit =
   ignore @@ get_spatial_atom_from var f
 
 let pto_to_list : atom -> atom = function
-  | PointsTo (first, LS_t (info, next)) ->
-      LS { info; first; next; min_len = 1 }
+  | PointsTo (first, LS_t (info, next)) -> LS { info; first; next; min_len = 1 }
   | PointsTo (src, DLS_t (info, next, prev)) ->
       DLS { info; first = src; last = src; next; prev; min_len = 1 }
-  | PointsTo (first, NLS_t (info, top, next)) -> NLS { info; first; top; next; min_len = 1 }
+  | PointsTo (first, NLS_t (info, top, next)) ->
+      NLS { info; first; top; next; min_len = 1 }
   | other -> other
 
 (** Pure atoms *)
@@ -501,10 +504,13 @@ let add_distinct (lhs : var) (rhs : var) (f : t) : t =
 (** Stack pointers *)
 
 let get_ref_opt (var : var) (f : t) : var option =
-  let eq_class = Option.value ~default:[var] @@ find_equiv_class var f in
-  List.find_map (function
-    | Ref (src, target) when SL.Variable.MonoList.mem src eq_class -> Some target
-    | _ -> None) f
+  let eq_class = Option.value ~default:[ var ] @@ find_equiv_class var f in
+  List.find_map
+    (function
+      | Ref (src, target) when SL.Variable.MonoList.mem src eq_class ->
+          Some target
+      | _ -> None)
+    f
 
 let get_ref (src : var) (f : t) : var =
   get_ref_opt src f |> function
@@ -513,9 +519,11 @@ let get_ref (src : var) (f : t) : var =
 
 let update_ref (var : var) (target : var) (f : t) : t =
   if get_ref_opt var f |> Option.is_some then
-    List.map (function
-      | Ref (src, _) when SL.Variable.equal src var -> Ref (src, target)
-      | a -> a) f
+    List.map
+      (function
+        | Ref (src, _) when SL.Variable.equal src var -> Ref (src, target)
+        | a -> a)
+      f
   else add_atom (Ref (var, target)) f
 
 (** Integers *)
@@ -569,7 +577,8 @@ let split_by_reachability (vars : var list) (f : t) : t * t =
 
   let reachable_equiv_classes =
     rest |> get_equiv_classes
-    |> List.filter (List.exists (fun var -> SL.Variable.MonoList.mem var reachable_vars))
+    |> List.filter
+         (List.exists (fun var -> SL.Variable.MonoList.mem var reachable_vars))
     |> List.map (fun cls -> Eq cls)
   in
 
@@ -577,7 +586,8 @@ let split_by_reachability (vars : var list) (f : t) : t * t =
     List.filter
       (function
         | Distinct (lhs, rhs) ->
-            SL.Variable.MonoList.mem lhs reachable_vars && SL.Variable.MonoList.mem rhs reachable_vars
+            SL.Variable.MonoList.mem lhs reachable_vars
+            && SL.Variable.MonoList.mem rhs reachable_vars
         | Freed var | IntEq (var, _) | Ref (var, _) ->
             SL.Variable.MonoList.mem var reachable_vars
         | _ -> false)
@@ -588,7 +598,9 @@ let split_by_reachability (vars : var list) (f : t) : t * t =
     reachable_equiv_classes @ reachable_spatials @ other_reachable_atoms
   in
   let unreachable =
-    List.filter (fun atom -> not @@ BatList.mem_cmp compare_atom atom reachable) rest
+    List.filter
+      (fun atom -> not @@ BatList.mem_cmp compare_atom atom reachable)
+      rest
   in
   (reachable, unreachable)
 
@@ -615,7 +627,8 @@ let canonicalize ?(rename_fresh = true) (f : t) : t =
     | Distinct (lhs, rhs) ->
         if c lhs rhs > 0 then Distinct (lhs, rhs) else Distinct (rhs, lhs)
     | atom -> atom)
-  |> List.sort_uniq compare_atom |> standardize_fresh_var_names
+  |> List.sort_uniq compare_atom
+  |> standardize_fresh_var_names
 
 let canonicalize_state ?(rename_fresh = true) (state : state) : state =
   state |> List.map (canonicalize ~rename_fresh) |> List.sort_uniq compare

@@ -1,48 +1,33 @@
 (env
-  (dev
-    (flags
-      (:standard
-        ; turn errors into warnings
-        -warn-error -26 ; Unused var
-        -warn-error -27 ; Unused var
-        -warn-error -32 ; Unused var
-        -warn-error -33 ; Unused module open
-        -g
-      )
-    )
-  )
-)
+ (dev
+  (flags
+   (:standard
+    ; turn errors into warnings
+    -warn-error
+    -26 ; Unused var
+    -warn-error
+    -27 ; Unused var
+    -warn-error
+    -32 ; Unused var
+    -warn-error
+    -33 ; Unused module open
+    -g))))
 
 (include_subdirs unqualified)
 
 (library
-  (name seal)
-  (public_name frama-c-seal.core)
-  (modules :standard)
-  (flags
-    :standard
-    -open Frama_c_kernel
-  )
-  (libraries
-    frama-c.kernel
-    frama-c-server.core
-    astral
-    sha
-    uuidm
-  )
-  (inline_tests
-    (flags (-stop-on-error))
-  )
-  (preprocess
-    (pps
-      ppx_compare
-      ppx_inline_test
-    )
-  )
-)
+ (name seal)
+ (public_name frama-c-seal.core)
+ (modules :standard)
+ (flags :standard -open Frama_c_kernel)
+ (libraries frama-c.kernel frama-c-server.core astral sha uuidm)
+ (inline_tests
+  (flags (-stop-on-error)))
+ (preprocess
+  (pps ppx_compare ppx_inline_test)))
 
 (plugin
-  (name seal)
-  (libraries frama-c-seal.core)
-  (site (frama-c plugins))
-)
+ (name seal)
+ (libraries frama-c-seal.core)
+ (site
+  (frama-c plugins)))

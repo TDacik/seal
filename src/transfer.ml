@@ -60,13 +60,15 @@ let rec materialize (var : Formula.var) (f : Formula.t) : Formula.t list =
       [
         f
         |> add_atom (PointsTo (var, DLS_t (dls.info, fresh_var, dls.prev)))
-        |> add_atom @@ mk_dls dls.info fresh_var dls.last var dls.next (dls.min_len - 1);
+        |> add_atom
+           @@ mk_dls dls.info fresh_var dls.last var dls.next (dls.min_len - 1);
       ]
   | DLS dls when dls.min_len > 0 && SL.Variable.equal var dls.last ->
       [
         f
         |> add_atom (PointsTo (var, DLS_t (dls.info, dls.next, fresh_var)))
-        |> add_atom @@ mk_dls dls.info dls.first fresh_var dls.prev var (dls.min_len - 1);
+        |> add_atom
+           @@ mk_dls dls.info dls.first fresh_var dls.prev var (dls.min_len - 1);
       ]
   (* cases where DLS has minimum length of zero -> case split *)
   | DLS dls when SL.Variable.equal var dls.first ->
@@ -91,7 +93,8 @@ let rec materialize (var : Formula.var) (f : Formula.t) : Formula.t list =
         f
         |> add_atom (PointsTo (var, NLS_t (nls.info, fresh_var, fresh_ls)))
         |> add_atom @@ mk_ls nls.info.sll_info fresh_ls nls.next 0
-        |> add_atom @@ mk_nls nls.info fresh_var nls.top nls.next (nls.min_len - 1);
+        |> add_atom
+           @@ mk_nls nls.info fresh_var nls.top nls.next (nls.min_len - 1);
       ]
   (* case where NLS has minimum length == 0 *)
   | NLS nls ->
@@ -104,39 +107,35 @@ let rec materialize (var : Formula.var) (f : Formula.t) : Formula.t list =
       (* length 0 cases *)
       :: (f |> add_eq nls.first nls.top |> materialize var)
   | Predicate (name, xs) ->
-    Config.Self.debug "Unfolding predicate %s(%s)" name (SL.Variable.show_list xs);
-    let res =
-      GlobalSID.cases name (List.map SL.Term.of_var xs)
-      |> List.map (fun case -> SL.mk_star [Astral_query.convert f; case])
-      |> List.map Astral2Seal.convert
-      |> List.map List.hd (* TODO *)
-      |> List.filter Astral_query.check_sat
-    in
-    assert (not @@ List.is_empty res);
-    res
+      Config.Self.debug "Unfolding predicate %s(%s)" name
+        (SL.Variable.show_list xs);
+      let res =
+        GlobalSID.cases name (List.map SL.Term.of_var xs)
+        |> List.map (fun case -> SL.mk_star [ Astral_query.convert f; case ])
+        |> List.map Astral2Seal.convert
+        |> List.map List.hd (* TODO *)
+        |> List.filter Astral_query.check_sat
+      in
+      assert (not @@ List.is_empty res);
+      res
   | _ -> assert false
 
 let pointed_type t =
   let open Cil_types in
-  match (Ast_types.unroll_deep t).tnode with
-  | TPtr t -> t
-  | _ -> assert false
+  match (Ast_types.unroll_deep t).tnode with TPtr t -> t | _ -> assert false
 
 let is_single_elem lhs size =
   let t = pointed_type @@ Cil.typeOfLval @@ Option.get lhs in
   let size_type = Cil.bytesSizeOf t in
   let size_requested = Cil.constFoldToInt ~machdep:true size in
   match size_requested with
-    | None -> false
-    | Some n -> Z.equal n (Z.of_int size_type)
-
+  | None -> false
+  | Some n -> Z.equal n (Z.of_int size_type)
 
 (** transfer function for function calls *)
 let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
-    (func : Cil_types.varinfo)
-    (args : Formula.var list)
-    (orig_args : Cil_types.exp list)
-    (formula : Formula.t) :
+    (func : Cil_types.varinfo) (args : Formula.var list)
+    (orig_args : Cil_types.exp list) (formula : Formula.t) :
     Formula.t list * Formula.var list =
   let get_allocation (init_vars_to_null : bool) =
     let lhs = SL.Variable.mk_fresh "func_ret" lhs_sort in
@@ -146,21 +145,27 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
         else SL.Variable.mk_fresh "fresh" lhs_sort
       in
       let lhs_orig = Option.get lhs_orig in
-      let typ = match (Ast_types.unroll_deep @@ Cil.typeOfLval lhs_orig).tnode with
-        | TPtr { tnode = TComp structure; _ } -> Option.some @@ Types.get_struct_type structure
+      let typ =
+        match (Ast_types.unroll_deep @@ Cil.typeOfLval lhs_orig).tnode with
+        | TPtr { tnode = TComp structure; _ } ->
+            Option.some @@ Types.get_struct_type structure
         | _ -> None
       in
       match typ with
-      | Some (Sll info) when lhs_sort = SL_builtins.loc_ls || lhs_sort = SL.Sort.loc_nil ->
+      | Some (Sll info)
+        when lhs_sort = SL_builtins.loc_ls || lhs_sort = SL.Sort.loc_nil ->
           Formula.PointsTo (lhs, LS_t (info, fresh_from_lhs ()))
       | Some (Dll info) when lhs_sort = SL_builtins.loc_dls ->
-          Formula.PointsTo (lhs, DLS_t (info, fresh_from_lhs (), fresh_from_lhs ()))
+          Formula.PointsTo
+            (lhs, DLS_t (info, fresh_from_lhs (), fresh_from_lhs ()))
       | Some (Nl info) when lhs_sort = SL_builtins.loc_nls ->
           Formula.PointsTo
             ( lhs,
-              NLS_t (info, fresh_from_lhs (), SL.Variable.mk_fresh "fresh" Sort.loc_ls)
-            )
-      | Some (Struct _ ) | None ->
+              NLS_t
+                ( info,
+                  fresh_from_lhs (),
+                  SL.Variable.mk_fresh "fresh" Sort.loc_ls ) )
+      | Some (Struct _) | None ->
           let fields =
             Types.get_struct_def lhs_sort |> MemoryModel.StructDef.get_fields
           in
@@ -189,9 +194,11 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
   in
 
   match (func.vname, args, orig_args) with
-  | "malloc", _, [size] when is_single_elem lhs_orig size -> get_allocation false
+  | "malloc", _, [ size ] when is_single_elem lhs_orig size ->
+      get_allocation false
   | "calloc", _, _ -> get_allocation true (* TODO: check size *)
-  | "malloc", _, _ -> Config.Self.not_yet_implemented ~current:true "Memory blocks/arrays"
+  | "malloc", _, _ ->
+      Config.Self.not_yet_implemented ~current:true "Memory blocks/arrays"
   (*TODO: *)
   (* | "realloc", var :: _ -> *)
   (*     (* realloc changes the pointer value => all references to `var` are now dangling *) *)
@@ -214,8 +221,8 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
           raise @@ Formula.Bug (Invalid_free (var, formula), pos)
       | e -> raise e)
   | "__VERIFIER_nondet_int", _, _ -> ([ formula ], [ Formula.nondet ])
-  | "__VERIFIER_print_state", _,  _ ->
-      Config.Self.result ~current:true "\027[36m%a\027[0m" Formula.pp_formula formula;
-      ([formula], [Formula.nil])
-
+  | "__VERIFIER_print_state", _, _ ->
+      Config.Self.result ~current:true "\027[36m%a\027[0m" Formula.pp_formula
+        formula;
+      ([ formula ], [ Formula.nil ])
   | _, args, _ -> Func_call.func_call args func formula lhs_sort

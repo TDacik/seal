@@ -41,8 +41,8 @@ let write_witness (bug_type : Formula.bug_type) (pos : Filepos.t) =
     \      language: C\n\
     \      specification: %s\n\
     \    uuid: %s\n"
-    filepath (Filepos.line pos) time data_model filepath hash filepath specification
-    uuid;
+    filepath (Filepos.line pos) time data_model filepath hash filepath
+    specification uuid;
   close_out oc;
   let oc = open_out "witness.graphml" in
   Printf.fprintf oc
