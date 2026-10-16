@@ -10,8 +10,8 @@ let parse_file filename =
 
 let formula_to_c_exp str =
   let unescape str =
-    if String.starts_with ~prefix:"\"" str
-    then List.nth (String.split_on_char '"' str) 1
+    if String.starts_with ~prefix:"\"" str then
+      List.nth (String.split_on_char '"' str) 1
     else str
   in
   let str = unescape str in

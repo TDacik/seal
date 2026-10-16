@@ -9,8 +9,8 @@ let main () =
   (* initialize the solver instance *)
   Astral_query.init ();
 
-  if Config.Validator.is_enabled ()
-  then Validator.validate @@ Config.Validator.Input.get ()
+  if Config.Validator.is_enabled () then
+    Validator.validate @@ Config.Validator.Input.get ()
   else Verifier.verify ();
 
   Astral.Solver.dump_stats (Option.get !solver);

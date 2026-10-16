@@ -2,25 +2,30 @@
          in SEAL analysis. *)
 
 open Cil_datatype
-
 module H = Stmt.Hashtbl
 
-let self : (Formula.state) H.t ref = ref (H.create 113 : Formula.state H.t)
+let self : Formula.state H.t ref = ref (H.create 113 : Formula.state H.t)
 
-(** Replace all variables that are out of the scope of the given function
-    by existential variables. *)
+(** Replace all variables that are out of the scope of the given function by
+    existential variables. *)
 let remove_out_of_scope_vars kf f =
   let open Astral in
   let is_outside_var var =
     let varinfo = GlobalInfo.var_to_varinfo var in
-    not @@ varinfo.vglob
-    && not @@ Kernel_function.is_formal_or_local varinfo kf
+    (not @@ varinfo.vglob)
+    && (not @@ Kernel_function.is_formal_or_local varinfo kf)
   in
   Formula.get_vars f
-  |> List.fold_left (fun acc var ->
-      if SL.Variable.is_nil var || Common.is_fresh_var var || Common.is_nondet_var var then acc
-      else if is_outside_var var then Formula.substitute acc ~var ~by:(SL.Variable.refresh var)
-      else acc) f
+  |> List.fold_left
+       (fun acc var ->
+         if
+           SL.Variable.is_nil var || Common.is_fresh_var var
+           || Common.is_nondet_var var
+         then acc
+         else if is_outside_var var then
+           Formula.substitute acc ~var ~by:(SL.Variable.refresh var)
+         else acc)
+       f
 
 let add stmt f =
   if Common.is_loop stmt then
@@ -31,6 +36,10 @@ let add stmt f =
   else ()
 
 let get () =
-  H.filter_map_inplace (fun _ states -> Some (BatList.unique ~eq:Formula.equal states)) !self;
-  H.filter_map_inplace (fun _ states -> Some (Simplification.deduplicate_formulas states)) !self;
+  H.filter_map_inplace
+    (fun _ states -> Some (BatList.unique ~eq:Formula.equal states))
+    !self;
+  H.filter_map_inplace
+    (fun _ states -> Some (Simplification.deduplicate_formulas states))
+    !self;
   !self

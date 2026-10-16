@@ -10,7 +10,7 @@ open Config
 type struct_type =
   | Sll of AbstractionHint.sll_info
   | Dll of AbstractionHint.dll_info
-  | Nl  of AbstractionHint.nll_info
+  | Nl of AbstractionHint.nll_info
   | Struct of compinfo
 
 (** Classification of struct fields *)
@@ -26,15 +26,16 @@ let pp_field_type fmt = function
 let rec pp_struct_type fmt stype =
   let open Cil_printer in
   match stype with
-  | Sll {compinfo; next_field} ->
-    Format.fprintf fmt "%a[%a]" Cil_printer.pp_compinfo compinfo pp_field next_field
-  | Dll {compinfo; next_field; prev_field} ->
-    Format.fprintf fmt "%a[%a, %a]" Cil_printer.pp_compinfo compinfo pp_field next_field pp_field prev_field
-  | Nl {compinfo; top_field; down_field; sll_info} ->
-    Format.fprintf fmt "%a[%a, %a, %a]" Cil_printer.pp_compinfo compinfo pp_field top_field pp_field down_field pp_struct_type (Sll sll_info)
-  | Struct compinfo ->
-    Format.fprintf fmt "%a" Cil_printer.pp_compinfo compinfo
-
+  | Sll { compinfo; next_field } ->
+      Format.fprintf fmt "%a[%a]" Cil_printer.pp_compinfo compinfo pp_field
+        next_field
+  | Dll { compinfo; next_field; prev_field } ->
+      Format.fprintf fmt "%a[%a, %a]" Cil_printer.pp_compinfo compinfo pp_field
+        next_field pp_field prev_field
+  | Nl { compinfo; top_field; down_field; sll_info } ->
+      Format.fprintf fmt "%a[%a, %a, %a]" Cil_printer.pp_compinfo compinfo
+        pp_field top_field pp_field down_field pp_struct_type (Sll sll_info)
+  | Struct compinfo -> Format.fprintf fmt "%a" Cil_printer.pp_compinfo compinfo
 
 let pp_typ_node fmt tnode = Cil_printer.pp_typ fmt { tnode; tattr = [] }
 
@@ -55,17 +56,19 @@ let rec get_self_and_sll_fields (structure : compinfo) :
   let self_pointers, other_pointers =
     structure |> get_struct_pointer_fields
     |> List.partition (fun field ->
-           match Ast_types.unroll_deep_node field.ftype with
-           | TPtr { tnode = TComp target_struct; _ } ->
-               target_struct.ckey = structure.ckey
-           | _ -> false)
+        match Ast_types.unroll_deep_node field.ftype with
+        | TPtr { tnode = TComp target_struct; _ } ->
+            target_struct.ckey = structure.ckey
+        | _ -> false)
   in
   let sll_pointers =
     List.filter_map
       (fun field ->
         match Ast_types.unroll_deep_node field.ftype with
-        | TPtr { tnode = TComp structure; _ } ->
-          (match get_struct_type structure with Sll sll_info -> Some (field, sll_info) | _ -> None)
+        | TPtr { tnode = TComp structure; _ } -> (
+            match get_struct_type structure with
+            | Sll sll_info -> Some (field, sll_info)
+            | _ -> None)
         | _ -> None)
       other_pointers
   in
@@ -110,8 +113,7 @@ let type_info : (Sort.t * MemoryModel.StructDef.t) HT.t =
 let structures : struct_type list ref = ref []
 
 (** Create canonical sort representing pointer to the given structure. *)
-let struct_ptr_sort structure =
-  Sort.mk_loc ("Ptr_" ^ structure.cname)
+let struct_ptr_sort structure = Sort.mk_loc ("Ptr_" ^ structure.cname)
 
 (** Convert C type to Astral sort. *)
 let rec c_type_to_astral typ =
@@ -124,12 +126,12 @@ let rec c_type_to_astral typ =
     | Nl _ -> SL_builtins.loc_nls
     | _ -> struct_ptr_sort structure)
   | TPtr t -> Sort.mk_loc ("Ptr_" ^ Sort.name @@ c_type_to_astral t)
-  | TVoid -> Sort.mk_uninterpreted "void" (* TODO: should Astral have a void/unit sort? *)
-
+  | TVoid ->
+      Sort.mk_uninterpreted
+        "void" (* TODO: should Astral have a void/unit sort? *)
   | TFloat _ -> Common.unsupported "float type"
   | TArray _ -> Common.unsupported "array type: %a" Cil_printer.pp_typ typ
   | TFun _ -> raise Skip
-
   | TNamed _ -> assert false
   | TEnum _ ->
       Config.Self.abort "Enum: %a" Cil_printer.pp_typ typ
@@ -175,10 +177,9 @@ let get_type_info typ =
           | Sll _ -> (SL_builtins.loc_ls, Option.Some SL_builtins.struct_ls)
           | Dll _ -> (SL_builtins.loc_dls, Option.Some SL_builtins.struct_dls)
           | Nl _ -> (SL_builtins.loc_nls, Option.Some SL_builtins.struct_nls)
-          | _ -> default_sort, Option.some @@ c_struct_to_astral structure)
-    | TPtr t ->
-      default_sort, Option.some @@ c_atomic_type_to_astral_struct t
-    | _ -> default_sort, None
+          | _ -> (default_sort, Option.some @@ c_struct_to_astral structure))
+    | TPtr t -> (default_sort, Option.some @@ c_atomic_type_to_astral_struct t)
+    | _ -> (default_sort, None)
   in
   let _ = match struct_def with
   | None -> ()
@@ -191,11 +192,9 @@ let get_type_info typ =
   (sort, struct_def)
 
 let get_struct_def (sort : Sort.t) : MemoryModel.StructDef.t =
-  Self.debug "Type information:";
-  HT.iter (fun typ (sort, def) ->
-    Self.debug ">  %a -> %a : %s"
-      Cil_printer.pp_typ typ Sort.pp sort (MemoryModel.StructDef.show def)) type_info;
-  match Seq.find (fun (s, _) -> Sort.equal sort s) @@ HT.to_seq_values type_info with
+  match
+    Seq.find (fun (s, _) -> Sort.equal sort s) @@ HT.to_seq_values type_info
+  with
   | Some (_, def) -> def
   | None -> Config.Self.abort "No structure for sort %a" Sort.pp sort
 
@@ -256,9 +255,11 @@ let process_types (file : file) = ()
   Visitor.visitFramacFile process_types file;
 
   Self.debug "Type information:";
-  HT.iter (fun typ (sort, def) ->
-    Self.debug ">  %a -> %a : %s"
-      Cil_printer.pp_typ typ Sort.pp sort (MemoryModel.StructDef.show def)) type_info;
+  HT.iter
+    (fun typ (sort, def) ->
+      Self.debug ">  %a -> %a : %s" Cil_printer.pp_typ typ Sort.pp sort
+        (MemoryModel.StructDef.show def))
+    type_info;
 
   let heap_sort =
     HT.to_seq_values type_info |> List.of_seq |> HeapSort.of_list

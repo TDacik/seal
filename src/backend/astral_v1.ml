@@ -15,7 +15,8 @@ let convert (f : Formula.t) : SL.t =
     | Eq vars -> SL.mk_eq (List.map v vars)
     | Distinct (lhs, rhs) -> SL.mk_distinct2 (v lhs) (v rhs)
     | Freed var -> SL_builtins.mk_freed (v var)
-    | PointsTo (src, LS_t (_, next)) -> SL_builtins.mk_pto_ls (v src) ~next:(v next)
+    | PointsTo (src, LS_t (_, next)) ->
+        SL_builtins.mk_pto_ls (v src) ~next:(v next)
     | PointsTo (src, DLS_t (_, next, prev)) ->
         SL_builtins.mk_pto_dls (v src) ~next:(v next) ~prev:(v prev)
     | PointsTo (src, NLS_t (_, top, next)) ->
@@ -24,7 +25,8 @@ let convert (f : Formula.t) : SL.t =
         let vars = vars |> List.map snd |> List.map v in
         let struct_def = Types.get_struct_def @@ SL.Variable.get_sort src in
         SL.mk_pto_struct (v src) struct_def vars
-    | Predicate (name, params) -> SL.mk_predicate name (List.map SL.Term.of_var params)
+    | Predicate (name, params) ->
+        SL.mk_predicate name (List.map SL.Term.of_var params)
     | LS ls -> (
         let first = v ls.first in
         let next = v ls.next in

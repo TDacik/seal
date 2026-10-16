@@ -75,7 +75,8 @@ let func_call (args : Formula.var list) (func : varinfo) (formula : Formula.t)
     Kernel_function.get_formals func |> List.map GlobalInfo.varinfo_to_var
   in
   let locals =
-    params @ (Kernel_function.get_locals func |> List.map GlobalInfo.varinfo_to_var)
+    params
+    @ (Kernel_function.get_locals func |> List.map GlobalInfo.varinfo_to_var)
   in
 
   let reachable, unreachable = Formula.split_by_reachability args formula in

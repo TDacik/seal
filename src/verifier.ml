@@ -18,7 +18,7 @@ let check_memcleanup main =
   List.iter
     (fun formula ->
       Formula.get_spatial_atoms formula |> function
-        (* TODO: should raise Memcleanup instead *)
+      (* TODO: should raise Memcleanup instead *)
       | atom :: _ -> Formula.report_bug (Invalid_memtrack (atom, formula))
       | _ -> ())
     final_state
@@ -99,22 +99,22 @@ let run_analysis () =
 
 let verify () =
   (* run the analysis and catch exceptions representing bug detections *)
-  (try
+  try
     run_analysis ();
     Self.result "Successful_verification"
   with
-    | (Log.AbortError _ | Log.AbortFatal _ | Log.FeatureRequest _) as e -> raise e
-    | e -> (
-     let backtrace = Printexc.get_backtrace () in
-     Common.warning "BACKTRACE: \n%s" backtrace;
+  | (Log.AbortError _ | Log.AbortFatal _ | Log.FeatureRequest _) as e -> raise e
+  | e -> (
+      let backtrace = Printexc.get_backtrace () in
+      Common.warning "BACKTRACE: \n%s" backtrace;
 
-     if !Analysis.unknown_condition_reached then Self.result "Unknown_result";
+      if !Analysis.unknown_condition_reached then Self.result "Unknown_result";
 
-     match e with
-     | Formula.Bug (bug_type, pos) ->
-         if Config.Svcomp_mode.get () then Witness.write_witness bug_type pos;
-         (* print the type of detected bug *)
-         Self.result ~source:pos "%a" Formula.pp_bug_type bug_type
-     | e ->
-         Common.warning "EXCEPTION: %s" (Printexc.to_string e);
-         if not @@ Config.Catch_exceptions.get () then raise e))
+      match e with
+      | Formula.Bug (bug_type, pos) ->
+          if Config.Svcomp_mode.get () then Witness.write_witness bug_type pos;
+          (* print the type of detected bug *)
+          Self.result ~source:pos "%a" Formula.pp_bug_type bug_type
+      | e ->
+          Common.warning "EXCEPTION: %s" (Printexc.to_string e);
+          if not @@ Config.Catch_exceptions.get () then raise e)

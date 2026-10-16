@@ -1,3 +1,4 @@
 (alias
-  (name vtest)
-  (deps (alias_rec runtest)))
+ (name vtest)
+ (deps
+  (alias_rec runtest)))

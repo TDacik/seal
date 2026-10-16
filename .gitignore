@@ -13,3 +13,4 @@ witness.graphml
 svcomp/_opam
 results*
 svcomp.zip
+.frama-c-gui.local

@@ -39,7 +39,9 @@ let computeFirstPredecessor _ state = state
 let combinePredecessors _ ~old:(old_state : t) (new_state : t) : t option =
   Async.yield ();
 
-  let joined_state = Simplification.deduplicate_formulas @@ new_state @ old_state in
+  let joined_state =
+    Simplification.deduplicate_formulas @@ new_state @ old_state
+  in
 
   let state_changed joined_state old_state =
     if Config.Simple_join.get () then
@@ -117,7 +119,8 @@ let doGuard _ (condition : exp) (state : t) : t guardaction * t guardaction =
   let th = List.filter Astral_query.check_sat th in
   let el = List.filter Astral_query.check_sat el in
 
-  if List.is_empty th && List.is_empty el then failwith "Both branches dead" else ();
+  if List.is_empty th && List.is_empty el then failwith "Both branches dead"
+  else ();
 
   Self.debug ~current:true ~dkey:Printing.do_guard
     "state:\n%athen branch:\n%aelse branch:\n%a" Formula.pp_state state
@@ -155,8 +158,8 @@ let doStmt_verifier (stmt : stmt) (state : t) : t stmtaction =
           (* reset counters for all inner loops of the loop we are entering *)
           get_inner_loops block
           |> List.iter (fun key ->
-                 Common.debug "removing loop %a" Printer.pp_stmt key;
-                 Hashtbl.remove loop_cycles key);
+              Common.debug "removing loop %a" Printer.pp_stmt key;
+              Hashtbl.remove loop_cycles key);
           SDefault
       | Some _ ->
           warning "Skipping loop cycle";
@@ -166,7 +169,7 @@ let doStmt_verifier (stmt : stmt) (state : t) : t stmtaction =
           SDefault)
   | Instr instr when Config.Svcomp_mode.get () -> (
       match instr with
-      | Call (_, { enode = Lval (Var fn, NoOffset); _ }, _, _) ->
+      | Call (_, Var fn, _, _) ->
           if List.mem fn.vname [ "myexit"; "fail"; "exit" ] then
             SDone
           else SDefault
@@ -175,56 +178,67 @@ let doStmt_verifier (stmt : stmt) (state : t) : t stmtaction =
 
 let doStmt_validator (stmt : stmt) (orig_state : t) : t stmtaction =
   let is_first_iteration stmt =
-    try (Hashtbl.find !Func_call.function_context.loop_cycles stmt) == 0
+    try Hashtbl.find !Func_call.function_context.loop_cycles stmt == 0
     with Not_found -> true
   in
   match stmt.skind with
   | Loop _ ->
-    let line = Common.stmt_line stmt in
-    let invariant =
-      match GlobalWitness.get_loop_invariant stmt with
-      | None -> raise @@ Exceptions.MissingInvariant line
-      | Some invariant -> invariant
-    in
-    let rec invariant_add invariant f = match Astral.SL.view invariant with
-      | Or psis ->
-        Astral.SL.mk_or @@ List.map (fun psi -> invariant_add psi f) psis
-      | Exists (xs, body) -> Astral.SL.mk_exists xs @@ invariant_add body f
-      | _ -> Astral.SL.mk_star [invariant; f]
-    in
-    if is_first_iteration stmt then (
-      Self.debug "Checking invariant %s (%d) [%d]" (Astral.SL.show invariant.content) line (List.length orig_state);
-      let state = List.map Astral_query.convert orig_state in
-      let frames, rests = List.split @@ List.map (FrameInference.compute stmt) state in
-      let _ = Self.debug ">> Invariant: %s" (Astral.SL.show invariant.content) in
-      let _ = Self.debug ">> Frames: %s" (Astral.SL.show_list frames) in
-      let _ = Self.debug ">> Rests : %s" (Astral.SL.show_list rests) in
-      if Astral_query.check_entailment' state invariant.content then
-        let _ = Self.debug "Invariant for line %d holds on entry" line in
-        let common_frame = match frames with
-          | [] -> []
-          | [x] -> [x]
-          | f :: tl ->
-            List.filter (fun atom ->
-              List.for_all (fun frame' ->
-                BatList.mem_cmp Astral.SL.compare atom (Astral.SL.get_operands frame')
-              ) tl
-            ) (Astral.SL.get_operands f)
+      let line = Common.stmt_line stmt in
+      let invariant =
+        match GlobalWitness.get_loop_invariant stmt with
+        | None -> raise @@ Exceptions.MissingInvariant line
+        | Some invariant -> invariant
+      in
+      let rec invariant_add invariant f =
+        match Astral.SL.view invariant with
+        | Or psis ->
+            Astral.SL.mk_or @@ List.map (fun psi -> invariant_add psi f) psis
+        | Exists (xs, body) -> Astral.SL.mk_exists xs @@ invariant_add body f
+        | _ -> Astral.SL.mk_star [ invariant; f ]
+      in
+      if is_first_iteration stmt then (
+        Self.debug "Checking invariant %s (%d) [%d]"
+          (Astral.SL.show invariant.content)
+          line (List.length orig_state);
+        let state = List.map Astral_query.convert orig_state in
+        let frames, rests =
+          List.split @@ List.map (FrameInference.compute stmt) state
+        in
+        let _ =
+          Self.debug ">> Invariant: %s" (Astral.SL.show invariant.content)
+        in
+        let _ = Self.debug ">> Frames: %s" (Astral.SL.show_list frames) in
+        let _ = Self.debug ">> Rests : %s" (Astral.SL.show_list rests) in
+        if Astral_query.check_entailment' state invariant.content then
+          let _ = Self.debug "Invariant for line %d holds on entry" line in
+          let common_frame =
+            match frames with
+            | [] -> []
+            | [ x ] -> [ x ]
+            | f :: tl ->
+                List.filter
+                  (fun atom ->
+                    List.for_all
+                      (fun frame' ->
+                        BatList.mem_cmp Astral.SL.compare atom
+                          (Astral.SL.get_operands frame'))
+                      tl)
+                  (Astral.SL.get_operands f)
           in
 
-        let res = invariant_add invariant.content (Astral.SL.mk_star common_frame) in
+          let res =
+            invariant_add invariant.content (Astral.SL.mk_star common_frame)
+          in
 
-        let res = (Astral2Seal.convert res) in
-        SUse res
-      else raise @@ Exceptions.NotInvariant (orig_state, invariant)
-    )
-    (* Fixpoint wasn't reached using user-provided invariant *)
-    else raise @@ Exceptions.NotInductive invariant
+          let res = Astral2Seal.convert res in
+          SUse res
+        else raise @@ Exceptions.NotInvariant (orig_state, invariant))
+      (* Fixpoint wasn't reached using user-provided invariant *)
+        else raise @@ Exceptions.NotInductive invariant
   | _ -> SDefault
 
 let doStmt (stmt : stmt) (state : t) : t stmtaction =
-  if Config.Validator.is_enabled ()
-  then doStmt_validator stmt state
+  if Config.Validator.is_enabled () then doStmt_validator stmt state
   else doStmt_verifier stmt state
 
 (* Simplify and deduplicate formulas *)
@@ -243,16 +257,17 @@ let doEdge (prev_stmt : stmt) (next_stmt : stmt) (state : t) : t =
     | _ when Config.Edge_abstraction.get () ->
         formula |> Abstraction.convert_to_ls |> Abstraction.convert_to_dls
         |> Abstraction.convert_to_nls
-        |> (fun x -> [x])
+        |> fun x -> [ x ]
     | Loop _ ->
         formula |> Abstraction.convert_to_ls |> Abstraction.convert_to_dls
         |> Abstraction.convert_to_nls
-        |> (fun x -> [x])
-    | _ -> [formula]
+        |> fun x -> [ x ]
+    | _ -> [ formula ]
   in
 
   let deduplicate_states : t -> t =
-    if Config.Edge_deduplication.get () then Simplification.deduplicate_formulas else Fun.id
+    if Config.Edge_deduplication.get () then Simplification.deduplicate_formulas
+    else Fun.id
   in
 
   let open Simplification in

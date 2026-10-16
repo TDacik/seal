@@ -19,14 +19,13 @@ module Dump_queries = Self.False (struct
 end)
 
 module Abstraction_mode = struct
-    include Self.Enum (struct
+  include Self.Enum (struct
     let option_name = "-seal-abstraction"
     let help = "TODO"
 
     type t = [`Builtin | `Synthesis | `None]
     let default = `Builtin
     let values = [(`Builtin, "builtin"); (`Synthesis, "synthesis"); (`None, "none")]
-
   end)
 
   let is_builtin () = get () = `Builtin
@@ -54,7 +53,6 @@ module Backend_solver = Self.Enum (struct
   type t = AstralConfig.Backend.t
 
   let default = `Bitwuzla
-
   let values = AstralConfig.Backend.values_with_names
 end)
 
@@ -65,7 +63,7 @@ module Astral_mode = Self.Enum (struct
     "Old == builtin predicate encoding, New == user defined predicates \
      (default)"
 
-  type t = [ `Old | `New | `New2]
+  type t = [ `Old | `New | `New2 ]
 
   let default = `New2
   let values = [ (`Old, "old"); (`New, "new"); (`New2, "new2") ]
@@ -137,18 +135,19 @@ end)
 
 module Check_memcleanup = Self.True (struct
   let option_name = "-seal-memcleanup"
-  let help = "Report memory leaks for blocks that remain reachable but are not explicitly freed when \
-              program terminates."
+
+  let help =
+    "Report memory leaks for blocks that remain reachable but are not \
+     explicitly freed when program terminates."
 end)
 
-module Output_witness = Self.Filepath
-  (struct
-    let option_name = "-seal-witness"
-    let help = "Generate witness"
-    let arg_name = "path"
-    let existence = Frama_c_kernel.Filepath.Indifferent
-    let file_kind = "yml"
-  end)
+module Output_witness = Self.Filepath (struct
+  let option_name = "-seal-witness"
+  let help = "Generate witness"
+  let arg_name = "path"
+  let existence = Frama_c_kernel.Filepath.Indifferent
+  let file_kind = "yml"
+end)
 
 module Print_version = Self.False (struct
   let option_name = "-seal-version"
@@ -157,38 +156,41 @@ end)
 
 (** Witness validation *)
 module Validator = struct
-
   let group = Self.add_group "Witness validation"
+  let () = Parameter_customize.set_group group
+
+  module DryRun = Self.False (struct
+    let option_name = "-seal-validator-dry-run"
+    let help = "Parse the witness only"
+  end)
 
   let () = Parameter_customize.set_group group
-  module DryRun = Self.False
-    (struct
-      let option_name = "-seal-validator-dry-run"
-      let help = "Parse the witness only"
-    end)
+
+  module Input = Self.Filepath (struct
+    let option_name = "-seal-validate-witness"
+    let help = "Validate memory safety correctness witness in format 2.2"
+    let arg_name = "path"
+    let existence = Frama_c_kernel.Filepath.Must_exist
+    let file_kind = "yml"
+  end)
 
   let () = Parameter_customize.set_group group
-  module Input = Self.Filepath
-    (struct
-      let option_name = "-seal-validate-witness"
-      let help = "Validate memory safety correctness witness in format 2.2"
-      let arg_name = "path"
-      let existence = Frama_c_kernel.Filepath.Must_exist
-      let file_kind = "yml"
-    end)
 
-  let () = Parameter_customize.set_group group
-  module EntailmentStrategy = Self.Enum
-    (struct
-      let option_name = "-seal-validator-entailment"
-      let help = "Parse the witness only"
-      type t = [ `Precise | `TryApproximate | `ApproximateOnly]
-      let default = `TryApproximate
-      let values = [
-        (`Precise, "precise"); (`TryApproximate, "try-approx"); (`ApproximateOnly, "approx")
+  module EntailmentStrategy = Self.Enum (struct
+    let option_name = "-seal-validator-entailment"
+    let help = "Parse the witness only"
+
+    type t = [ `Precise | `TryApproximate | `ApproximateOnly ]
+
+    let default = `TryApproximate
+
+    let values =
+      [
+        (`Precise, "precise");
+        (`TryApproximate, "try-approx");
+        (`ApproximateOnly, "approx");
       ]
-    end)
+  end)
 
   let is_enabled () = not @@ Input.is_default ()
-
 end

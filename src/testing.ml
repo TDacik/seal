@@ -79,7 +79,8 @@ let assert_eq (lhs : t) (rhs : t) : bool =
     false)
 
 let assert_eq_state (lhs : state) (rhs : state) : bool =
-  if Formula.equal_state (canonicalize_state lhs) (canonicalize_state rhs) then true
+  if Formula.equal_state (canonicalize_state lhs) (canonicalize_state rhs) then
+    true
   else (
     print_warn_nl "States do not match:";
     print_warn "RESULT: ";
@@ -91,57 +92,55 @@ let assert_eq_state (lhs : state) (rhs : state) : bool =
 (* Default predicate infos *)
 open AbstractionHint
 
-let loc = Cil_datatype.Location.unknown
+let loc = Fileloc.unknown
 
 let sll_info =
   let compinfo =
-    Cil_const.mkCompInfo
-      true
-      "builtin_sll"
+    Cil_const.mkCompInfo true "builtin_sll"
       (fun self ->
         let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
-        Some ["next", typ, None, [], loc]
-      )
+        Some [ ("next", typ, None, None, [], loc) ])
       []
   in
   let next_field = List.hd @@ Option.get compinfo.cfields in
-  {compinfo; next_field}
+  { compinfo; next_field }
 
 let[@warning "-8"] dll_info =
   let compinfo =
-    Cil_const.mkCompInfo
-      true
-      "builtin_dll"
+    Cil_const.mkCompInfo true "builtin_dll"
       (fun self ->
         let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
-        Some ["next", typ, None, [], loc;
-              "prev", typ, None, [], loc]
-      )
+        Some
+          [
+            ("next", typ, None, None, [], loc);
+            ("prev", typ, None, None, [], loc);
+          ])
       []
   in
-  let [next_field; prev_field] = Option.get compinfo.cfields in
-  {compinfo; next_field; prev_field}
+  let [ next_field; prev_field ] = Option.get compinfo.cfields in
+  { compinfo; next_field; prev_field }
 
 let[@warning "-8"] nll_info =
   let compinfo =
-    Cil_const.mkCompInfo
-      true
-      "builtin_nll"
+    Cil_const.mkCompInfo true "builtin_nll"
       (fun self ->
         let typ = Cil_const.mk_tptr @@ Cil_const.mk_tcomp self in
-        let typ_down = Cil_const.mk_tptr @@ Cil_const.mk_tcomp sll_info.compinfo in
-        Some ["top", typ, None, [], loc;
-              "down", typ_down, None, [], loc]
-      )
+        let typ_down =
+          Cil_const.mk_tptr @@ Cil_const.mk_tcomp sll_info.compinfo
+        in
+        Some
+          [
+            ("top", typ, None, None, [], loc);
+            ("down", typ_down, None, None, [], loc);
+          ])
       []
   in
-  let [top_field; down_field] = Option.get compinfo.cfields in
-  {compinfo; top_field; down_field; sll_info}
+  let [ top_field; down_field ] = Option.get compinfo.cfields in
+  { compinfo; top_field; down_field; sll_info }
 
 let mk_ls = Formula.mk_ls sll_info
 let mk_dls = Formula.mk_dls dll_info
 let mk_nls = Formula.mk_nls nll_info
-
 let mk_pto_ls = Formula.mk_pto_ls sll_info
 let mk_pto_dls = Formula.mk_pto_dls dll_info
 let mk_pto_nls = Formula.mk_pto_nls nll_info
@@ -175,7 +174,8 @@ module Tests = struct
     let pto =
       SL.mk_pto_struct src_var struct_def [ field_0_var; field_1_var ]
     in
-    GlobalSID.reset (); (* TODO: this should be fixed in Astral *)
+    GlobalSID.reset ();
+    (* TODO: this should be fixed in Astral *)
     let solver = Solver.init () |> Solver.set_heap_sort heap_sort in
     Solver.check_sat solver pto
 
@@ -186,7 +186,8 @@ module Tests = struct
     let heap_sort = HeapSort.of_list [ (sort, struct_def) ] in
     (* src |-> {field_0: dst_0, field_1: dst_1} *)
     let pto = SL.mk_pto_struct src_var struct_def [] in
-    GlobalSID.reset (); (* TODO: this should be fixed in Astral *)
+    GlobalSID.reset ();
+    (* TODO: this should be fixed in Astral *)
     let solver = Solver.init () |> Solver.set_heap_sort heap_sort in
     Solver.check_sat solver pto
 
