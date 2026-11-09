@@ -547,8 +547,6 @@ let remove_int_val (var : var) : t -> t =
 let update_int_eq (var : var) (value : int) (f : t) : t =
   match get_int_val_opt var f with
   | _ when not @@ Config.Int_domain.get () -> f
-  | _ when abs value > abs @@ Config.Max_int_value.get () ->
-      remove_int_val var f
   | Some _ ->
       List.map
         (function IntEq (v, _) when var = v -> IntEq (v, value) | a -> a)

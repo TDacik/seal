@@ -198,7 +198,18 @@ let convert_to_nls (formula : Formula.t) : Formula.t =
   |> List.filter_map atom_to_nls
   |> List.fold_left do_abstraction formula
 
-let apply formula = formula |> convert_to_ls |> convert_to_dls |> convert_to_nls
+let value_abstraction =
+  List.filter (function
+    | Formula.IntEq (var, value) when abs value > abs @@ Config.Max_int_value.get () -> false
+    | _ -> true
+  )
+
+let apply formula =
+  formula
+  |> convert_to_ls
+  |> convert_to_dls
+  |> convert_to_nls
+  |> value_abstraction
 
 module Tests_LS = struct
   open Testing
