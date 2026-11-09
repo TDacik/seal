@@ -276,7 +276,7 @@ let get_equiv_classes : t -> var list list =
   List.filter_map (function Eq list -> Some list | _ -> None)
 
 let find_equiv_class (var : var) (f : t) : var list option =
-  f |> get_equiv_classes |> List.filter (List.mem var) |> function
+  f |> get_equiv_classes |> List.filter (BatList.mem_cmp SL.Variable.compare var) |> function
   | [] -> None
   | xs -> Some (SL.Variable.MonoList.unique @@ List.concat xs)
 
@@ -290,10 +290,10 @@ let remove_equiv_class (equiv_class : var list) (f : t) =
   remove_atom (Eq equiv_class) f
 
 let is_eq (lhs : var) (rhs : var) (f : t) : bool =
-  if lhs = rhs then true
+  if SL.Variable.equal lhs rhs then true
   else
     f |> find_equiv_class lhs
-    |> Option.map (List.exists (( = ) rhs))
+    |> Option.map (List.exists (SL.Variable.equal rhs))
     |> Option.value ~default:false
 
 (** Spatial atoms *)
@@ -305,19 +305,19 @@ let is_spatial_atom : atom -> bool = function
 let get_spatial_atoms : t -> t = List.filter is_spatial_atom
 
 let is_spatial_source (src : var) : atom -> bool = function
-  | PointsTo (var, _) -> src = var
-  | LS ls -> ls.first = src
-  | DLS dls -> dls.first = src || dls.last = src
-  | NLS nls -> nls.first = src
+  | PointsTo (var, _) -> SL.Variable.equal src var
+  | LS ls -> SL.Variable.equal ls.first src
+  | DLS dls -> SL.Variable.equal dls.first src || SL.Variable.equal dls.last src
+  | NLS nls -> SL.Variable.equal nls.first src
   | Predicate (_, x :: _) ->
       SL.Variable.equal x src (* TODO: make sure that x is always root *)
   | _ -> false
 
 let is_spatial_source_first (src : var) : atom -> bool = function
-  | PointsTo (var, _) -> src = var
-  | LS ls -> ls.first = src
-  | DLS dls -> dls.first = src
-  | NLS nls -> nls.first = src
+  | PointsTo (var, _) -> SL.Variable.equal src  var
+  | LS ls -> SL.Variable.equal ls.first src
+  | DLS dls -> SL.Variable.equal dls.first src
+  | NLS nls -> SL.Variable.equal nls.first src
   | Predicate (_, x :: _) ->
       SL.Variable.equal x src (* TODO: make sure that x is always root *)
   | _ -> false
