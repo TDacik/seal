@@ -208,7 +208,7 @@ let get_fresh_vars (f : t) : var list =
   f |> get_vars |> List.filter is_fresh_var
 
 let subsitute_in_atom (old_var : var) (new_var : var) : atom -> atom =
-  let v (var : var) : var = if var = old_var then new_var else var in
+  let v (var : var) : var = if SL.Variable.equal var old_var then new_var else var in
 
   function
   | Eq vars -> Eq (List.map v vars)
