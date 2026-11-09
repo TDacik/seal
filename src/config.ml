@@ -22,10 +22,10 @@ module Abstraction_mode = Self.Enum (struct
   let option_name = "-seal-abstraction"
   let help = "TODO"
 
-  type t = [ `Builtin | `Synthesis ]
+  type t = [ `None | `Builtin | `Synthesis ]
 
   let default = `Builtin
-  let values = [ (`Builtin, "builtin"); (`Synthesis, "synthesis") ]
+  let values = [ (`Builtin, "builtin"); (`Synthesis, "synthesis"); (`None, "none") ]
 end)
 
 module Edge_abstraction = Self.False (struct

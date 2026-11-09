@@ -91,5 +91,6 @@ let convert (f : Formula.t) : SL.t =
     | Ref (src, target) ->
         let struct_def = Types.get_struct_def @@ SL.Variable.get_sort src in
         SL.mk_pto_struct (v src) struct_def [ v target ]
+    | PointsTo (_, Void _) -> assert false
   in
   SL.mk_star (List.map map_atom f)
