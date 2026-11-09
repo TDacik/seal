@@ -116,11 +116,10 @@ let struct_ptr_sort structure = Sort.mk_loc ("Ptr_" ^ structure.cname)
 let rec c_type_to_astral typ =
   match (Ast_types.unroll_deep typ).tnode with
   | TInt _ -> Sort.mk_bitvector @@ Cil.bitsSizeOf typ
+  | TPtr { tnode = TVoid; _} -> Sort.loc_nil
   | TPtr { tnode = TComp structure; _ } -> struct_ptr_sort structure
   | TPtr t -> Sort.mk_loc ("Ptr_" ^ Sort.name @@ c_type_to_astral t)
-  | TVoid ->
-      Sort.mk_uninterpreted
-        "void" (* TODO: should Astral have a void/unit sort? *)
+  | TVoid -> Common.unsupported "void type"
   | TFloat _ -> Common.unsupported "float type"
   | TArray _ -> Common.unsupported "array type"
   | TFun _ -> Common.unsupported "function pointer type"
@@ -148,6 +147,7 @@ let get_type_info typ =
   let default_sort = c_type_to_astral typ in
   let sort, struct_def =
     match (Ast_types.unroll_deep typ).tnode with
+    | TPtr { tnode = TVoid; _ } -> (default_sort, None)
     | TPtr { tnode = TComp structure; _ } -> (
         if
           Config.Validator.is_enabled ()

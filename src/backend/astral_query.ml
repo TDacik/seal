@@ -39,7 +39,24 @@ let init () =
   let module C = (val !convertor) in
   Common.solver := Some (C.init ~dump_queries ~backend ~encoding ())
 
+(** Check the input formula. *)
+let check_formula (formula : Formula.t) : unit =
+  let check_atom = function
+    | Formula.PointsTo (_, Void _) -> failwith "void"
+    | _ -> ()
+  in
+  List.iter check_atom formula
+
+let check_state state = List.iter check_formula state
+
+let drop_void (formula : Formula.t) : Formula.t =
+  List.filter (function
+    | Formula.PointsTo (_, Void _) -> false
+    | _ -> true
+  ) formula
+
 let check_sat (formula : Formula.t) : bool =
+  let formula = drop_void formula in
   let astral_formula = convert formula in
   let cache_input = Formula.canonicalize formula in
 
@@ -70,6 +87,14 @@ let check_sat (formula : Formula.t) : bool =
   result
 
 let check_entailment (lhs : Formula.state) (rhs : Formula.state) : bool =
+  check_state lhs;
+  check_state rhs;
+
+  match InternalSolver.try_solve lhs rhs with
+  | Some res -> res
+  | None ->
+
+
   let cache_input =
     (Formula.canonicalize_state lhs, Formula.canonicalize_state rhs)
   in
