@@ -20,3 +20,9 @@ jobs:
 
       - name: Build
         run: opam exec -- dune build
+
+      - name: Install
+        run: opam exec -- dune install
+
+      - name: Verification tests
+        run: opam exec -- python3 scripts/tests/run_verification.py --print-errors
