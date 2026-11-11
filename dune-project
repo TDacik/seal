@@ -7,7 +7,7 @@
   (name frama-c-seal)
   (synopsis "Frama-C plugin for shape analysis using separation logic")
   (depends
-    (ocaml (>= 5.1.0))
+    (ocaml (>= 5.5.0))
     (frama-c (= 33.0))
     astral
     sha
