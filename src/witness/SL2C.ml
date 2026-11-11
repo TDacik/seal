@@ -111,6 +111,7 @@ module RichVar = struct
 end
 
 let target_to_fields = function
+  | Void _ -> []
   | LS_t (info, x) -> [ (info.next_field.forig_name, x) ]
   | DLS_t (info, x, y) ->
       [ (info.next_field.forig_name, x); (info.prev_field.forig_name, y) ]
@@ -252,13 +253,9 @@ let spatial_atom = function
 
 let perms_atom = function
   | PointsTo (x, _) ->
-      Option.some
-      @@ F.sprintf "\\canAccess(%s, %d)" (RichVar.output x)
-           (CorrectnessWitnessUtils.pointed_size @@ RichVar.find_varinfo x)
+      Option.some @@ F.sprintf "\\canAccess(%s, 1)" (RichVar.output x)
   | Ref (source, target) ->
-      Option.some
-      @@ F.sprintf "\\canAccess(%s, %d)" (RichVar.output source)
-           (CorrectnessWitnessUtils.pointed_size @@ RichVar.find_varinfo target)
+      Option.some @@ F.sprintf "\\canAccess(%s, 1)" (RichVar.output source)
   | _ -> None
 
 let preprocess =

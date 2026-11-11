@@ -22,8 +22,7 @@ let sll_definitions (info : sll_info) =
   let params = [ ("start", typ); ("end", typ) ] in
   let definition =
     Format.asprintf
-      {|(start == end) || (start != end && \separated(\canAccess(start, %d), %s(start->%s, end)))|}
-      (CorrectnessWitnessUtils.compinfo_size info.compinfo)
+      {|(start == end) || (start != end && \separated(\canAccess(start, 1), %s(start->%s, end)))|}
       name info.next_field.forig_name
   in
   [ { origin_stmt; name; params; definition } ]
@@ -39,18 +38,16 @@ let dll_definitions (info : dll_info) =
   in
   let definition =
     Format.asprintf
-      {|(start == end && start_back == end_back) || (start != end && start_back != end_back && start->%s == end_back && \separated(\canAccess(start, %d), %s(start->%s, end, start_back, start)))|}
+      {|(start == end && start_back == end_back) || (start != end && start_back != end_back && start->%s == end_back && \separated(\canAccess(start, 1), %s(start->%s, end, start_back, start)))|}
       info.prev_field.forig_name
-      (CorrectnessWitnessUtils.compinfo_size info.compinfo)
       name info.next_field.forig_name
   in
   let name' = name ^ "_simple" in
   let params' = [ ("start", typ); ("end", typ); ("end_back", typ) ] in
   let definition' =
     Format.asprintf
-      {|(start == end) || (start != end && start->%s == end_back && \separated(\canAccess(start, %d), %s(start->%s, end, start)))|}
+      {|(start == end) || (start != end && start->%s == end_back && \separated(\canAccess(start, 1), %s(start->%s, end, start)))|}
       info.prev_field.forig_name
-      (CorrectnessWitnessUtils.compinfo_size info.compinfo)
       name' info.next_field.forig_name
   in
   [
@@ -70,8 +67,7 @@ let nll_definitions info =
   let params = [ ("start", nls_typ); ("end", nls_typ); ("sink", ls_typ) ] in
   let definition =
     Format.asprintf
-      {|(start == end) || (start != end && \separated(\canAccess(start, %d), %s(start->%s, end, sink), %s(start->%s, sink)))|}
-      (CorrectnessWitnessUtils.compinfo_size info.compinfo)
+      {|(start == end) || (start != end && \separated(\canAccess(start, 1), %s(start->%s, end, sink), %s(start->%s, sink)))|}
       name info.top_field.forig_name ls_name info.down_field.forig_name
   in
   [ { origin_stmt; name; params; definition } ]
@@ -86,3 +82,4 @@ let get_predicates () =
     | _ -> []
   in
   List.concat_map fn !Types.structures
+  |> BatList.unique

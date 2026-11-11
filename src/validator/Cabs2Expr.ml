@@ -110,14 +110,16 @@ let rec convert e =
   | BINARY (AND, e1, e2) -> SL.mk_and @@ List.map convert [e1; e2]
   | BINARY (OR, e1, e2) -> SL.mk_or @@ List.map convert [e1; e2]
 
-  | CALL (exp, [base_e; _], _) when expr_name_equal "canAccess" exp ->
-    (* TODO: check size *)
-    let base = convert_term base_e in
-    let sort = SL.Term.get_sort base in
-    let cons = Types.get_struct_def sort in
-    let fields = StructDef.get_fields cons in
-    let rhs = List.map (fun f -> SL.Term.mk_fresh_var "e" @@ Field.get_sort f) fields in
-    SL.mk_pto_struct base cons rhs
+  | CALL (exp, [base_e; size_e], _) when expr_name_equal "canAccess" exp ->
+    (match size_e.expr_node with
+    | CONSTANT (CONST_INT "1")->
+      let base = convert_term base_e in
+      let sort = SL.Term.get_sort base in
+      let cons = Types.get_struct_def sort in
+      let fields = StructDef.get_fields cons in
+      let rhs = List.map (fun f -> SL.Term.mk_fresh_var "e" @@ Field.get_sort f) fields in
+      SL.mk_pto_struct base cons rhs
+    | _ -> Common.unsupported "Array in witness")
 
   | CALL (exp, _, _) when expr_name_equal "canAccess" exp ->
     Config.Self.fatal "\\canAcess expects two parameters"
