@@ -120,18 +120,6 @@ let rec materialize (var : Formula.var) (f : Formula.t) : Formula.t list =
       res
   | _ -> assert false
 
-let pointed_type t =
-  let open Cil_types in
-  match (Ast_types.unroll_deep t).tnode with TPtr t -> t | _ -> assert false
-
-let is_single_elem lhs size =
-  let t = pointed_type @@ Cil.typeOfLval @@ Option.get lhs in
-  let size_type = Cil.bytesSizeOf t in
-  let size_requested = Cil.constFoldToInt ~machdep:true size in
-  match size_requested with
-  | None -> false
-  | Some n -> Z.equal n (Z.of_int size_type)
-
 (** transfer function for function calls *)
 let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
     (func : Cil_types.varinfo) (args : Formula.var list)
@@ -139,6 +127,7 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
     Formula.t list * Formula.var list =
   let get_allocation (init_vars_to_null : bool) =
     let lhs = SL.Variable.mk_fresh "func_ret" lhs_sort in
+    Format.printf "Created %s in get_allocation" (SL.Variable.show lhs);
     let pto =
       let fresh_from_lhs () =
         if init_vars_to_null then Formula.nil
@@ -193,22 +182,11 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
         [ lhs; lhs ] )
   in
 
+  let lhs_ctype = Option.map Cil.typeOfLval lhs_orig in
+
   match (func.vname, args, orig_args) with
-  | "malloc", _, [ size ] when is_single_elem lhs_orig size ->
-      get_allocation false
-  | "calloc", _, _ -> get_allocation true (* TODO: check size *)
-  | "malloc", _, _ ->
-      Config.Self.not_yet_implemented ~current:true "Memory blocks/arrays"
-  (*TODO: *)
-  (* | "realloc", var :: _ -> *)
-  (*     (* realloc changes the pointer value => all references to `var` are now dangling *) *)
-  (*     Formula.materialize var formula *)
-  (*     |> List.map (fun formula -> *)
-  (*            let spatial_atom = Formula.get_spatial_atom_from var formula in *)
-  (*            formula *)
-  (*            |> Formula.remove_spatial_from var *)
-  (*            |> Formula.substitute_by_fresh var *)
-  (*            |> Formula.add_atom spatial_atom) *)
+  | "malloc", _, [size] -> Allocation.malloc formula size lhs_ctype
+  | "calloc", _, _ -> Common.unsupported "calloc"
   | "free", [ src ], _ -> (
       try
         formula |> materialize src
@@ -225,4 +203,4 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
       Config.Self.result ~current:true "\027[36m%a\027[0m" Formula.pp_formula
         formula;
       ([ formula ], [ Formula.nil ])
-  | _, args, _ -> Func_call.func_call args func formula lhs_sort
+  | _, args, _ -> Func_call.func_call args func formula lhs_ctype

@@ -37,7 +37,7 @@ type nls = {
 [@@deriving compare, equal]
 
 type pto_target =
-  | Void of Z.t
+  | Void of SL.Variable.t * Z.t
   | LS_t of sll_info * SL.Variable.t
   | DLS_t of dll_info * SL.Variable.t * SL.Variable.t
   | NLS_t of nll_info * SL.Variable.t * SL.Variable.t
@@ -114,8 +114,8 @@ let atom_to_string : atom -> 'a =
       vars |> List.map v |> String.concat " = " |> Format.sprintf "(%s)"
   | Distinct (lhs, rhs) -> Format.sprintf "(%s != %s)" (v lhs) (v rhs)
   | Freed var -> "freed(" ^ v var ^ ")"
-  | PointsTo (src, Void size) ->
-      Format.sprintf "(%s -> void[%s])" (v src) (Z.to_string size)
+  | PointsTo (src, Void (var, size)) ->
+      Format.sprintf "(%s -> void[%s, %s])" (v src) (v var) (Z.to_string size)
   | PointsTo (src, LS_t (_, next)) ->
       Format.sprintf "(%s -> %s)" (v src) (v next)
   | PointsTo (src, DLS_t (_, next, prev)) ->
@@ -142,7 +142,7 @@ let atom_to_string : atom -> 'a =
 let pp_pto_target fmt target =
   let pp_var = SL.Variable.pp in
   match target with
-  | Void size -> Format.fprintf fmt "void[%s]" (Z.to_string size)
+  | Void (var, size) -> Format.fprintf fmt "void[%a, %s]" pp_var var (Z.to_string size)
   | LS_t (_, next) -> Format.fprintf fmt "LS(next: %a)" pp_var next
   | DLS_t (_, next, prev) ->
       Format.fprintf fmt "DLS(next: %a, prev: %a)" pp_var next pp_var prev
@@ -214,7 +214,7 @@ let subsitute_in_atom (old_var : var) (new_var : var) : atom -> atom =
   | Eq vars -> Eq (List.map v vars)
   | Distinct (lhs, rhs) -> Distinct (v lhs, v rhs)
   | Freed var -> Freed (v var)
-  | PointsTo (src, Void size) -> PointsTo (v src, Void size)
+  | PointsTo (src, Void (var, size)) -> PointsTo (v src, Void (v var, size))
   | PointsTo (src, LS_t (info, next)) -> PointsTo (v src, LS_t (info, v next))
   | PointsTo (src, DLS_t (info, next, prev)) ->
       PointsTo (v src, DLS_t (info, v next, v prev))

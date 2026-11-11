@@ -67,7 +67,12 @@ let get_result_state (func : Kernel_function.t) (formula : Formula.t) :
       result_state
 
 let func_call (args : Formula.var list) (func : varinfo) (formula : Formula.t)
-    (lhs_sort : Sort.t) : Formula.t list * Formula.var list =
+    lhs_ctype : Formula.t list * Formula.var list =
+  let return_type = Cil.getReturnType func.vtype in
+  let lhs_sort =
+    if Ast_types.is_void return_type then None
+    else Some (Types.sort_of_type return_type)
+  in
   let func = Globals.Functions.get func in
   let return_stmt = Kernel_function.find_return func in
 
@@ -88,18 +93,26 @@ let func_call (args : Formula.var list) (func : varinfo) (formula : Formula.t)
       formula params args
   in
 
-  let convert_back_result (result : Formula.t) : Formula.t * Formula.var =
-    let result = rename_anchors result @ unreachable in
-    let lhs = SL.Variable.mk_fresh "func_ret" lhs_sort in
+  let substitute_return_var lhs formula =
     let return_var =
       match return_stmt.skind with
       | Return (Some { enode = Lval (Var var, NoOffset); _ }, _) ->
-          SL.Variable.mk (Common.var_unique_name var) lhs_sort
+        SL.Variable.mk (Common.var_unique_name var) (SL.Variable.get_sort lhs)
       | _ -> SL.Variable.mk "dummy" Sort.loc_nil
     in
-    ( result
-      |> Formula.substitute ~var:return_var ~by:lhs
-      |> Simplification.convert_vars_to_fresh locals,
+    Formula.substitute ~var:return_var ~by:lhs formula
+    |> Void_cast.apply lhs lhs_ctype
+  in
+
+  let convert_back_result (result : Formula.t) : Formula.t * Formula.var =
+    let lhs = match lhs_sort with
+      | None -> SL.Variable.mk_fresh "func_ret" Sort.loc_nil
+      | Some sort -> SL.Variable.mk_fresh "funce_ret" sort
+    in
+    (result
+    |> (fun f -> rename_anchors f @ unreachable)
+    |> substitute_return_var lhs
+    |> Simplification.convert_vars_to_fresh locals,
       lhs )
   in
 
@@ -124,8 +137,8 @@ let func_call (args : Formula.var list) (func : varinfo) (formula : Formula.t)
   List.map convert_back_result result_state |> List.split
 
 let func_call (args : Formula.var list) (func : varinfo) (formula : Formula.t)
-    (lhs_sort : Sort.t) : Formula.t list * Formula.var list =
-  try func_call args func formula lhs_sort
+    lhs_ctype : Formula.t list * Formula.var list =
+  try func_call args func formula lhs_ctype
   with Kernel_function.No_Definition | Kernel_function.No_Statement ->
     warning "skipping function %s (no definition)" func.vname;
     (* TODO: should this be a hard error? *)

@@ -179,10 +179,12 @@ let get_struct_def (sort : Sort.t) : MemoryModel.StructDef.t =
   | None -> Config.Self.abort "No structure for sort %a" Sort.pp sort
 
 let sort_of_type typ =
-  try fst @@ HT.find type_info typ
-  with _ ->
-    failwith
-    @@ Format.asprintf "No type info for '%a'" Cil_datatype.Typ.pretty typ
+  if Ast_types.is_void_ptr typ then Sort.loc_nil
+  else
+    try fst @@ HT.find type_info typ
+    with _ ->
+      failwith
+      @@ Format.asprintf "No type info for '%a'" Cil_datatype.Typ.pretty typ
 
 (** Memoizes list types inside [get_type_info] *)
 let process_types =
