@@ -14,6 +14,7 @@ let main () =
   else Verifier.verify ();
 
   Astral.Solver.dump_stats (Option.get !solver);
+  Config.Self.result "Astral queries: %d" !Astral_query.cnt;
   Config.Self.result "Astral time: %.2f" !Astral_query.solver_time
 
 (* register the analysis entrypoint into Frama-C  *)
