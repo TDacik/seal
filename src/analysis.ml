@@ -252,17 +252,54 @@ let doEdge (prev_stmt : stmt) (next_stmt : stmt) (state : t) : t =
     |> List.map GlobalInfo.varinfo_to_var
   in
 
+  let get_iteration () =
+    try List.length @@ Hashtbl.find !Func_call.function_context.results next_stmt
+    with Not_found -> 0
+  in
+
+  let abstraction_fn formula =
+    match Config.Abstraction_mode.get () with
+    | `Builtin -> [Abstraction.apply formula]
+    | `Synthesis when get_iteration () >= 3 -> (
+        let previous_states =
+          Hashtbl.find_opt !Func_call.function_context.results next_stmt
+          |> Option.get
+        in
+        Self.debug ~current:true "Applying synthesis";
+        List.iter (fun s -> Self.debug "\n  %a" Formula.pp_formula s) previous_states;
+        (* TODO: move *)
+        let existence_closure f =
+          let fresh_vars = Astral.SL.get_vars f |> List.filter is_fresh_var in
+          Astral.SL.mk_exists fresh_vars f
+        in
+        let res =
+          previous_states
+          |> List.map Astral_query.convert
+          |> List.map Astral_query.drop_freed
+          |> List.map existence_closure
+          |> Astral.Abstraction.compute (Option.get !Common.solver)
+        in
+        match res with
+        | None ->
+          let _ = Self.debug ">> fail" in
+          [formula]
+        | Some (f, preds) ->
+          let f = Astral2Seal.convert_sh f in
+          let _ = Self.debug "Abstrqaction result: >> %a" Formula.pp_formula f in
+          List.iter Astral.InductiveDefinition.print preds;
+          [f]
+      )
+    | _ ->
+        Self.debug ~level:3 "Delaying abstraction %a: %d" Common.pretty_stmt_loc next_stmt (get_iteration ());
+        Self.debug ~level:3 "%a" Formula.pp_formula formula;
+        [formula]
+  in
+
   let do_abstraction (formula : Formula.t) : Formula.state =
     match next_stmt.skind with
-    | _ when Config.Edge_abstraction.get () ->
-        formula |> Abstraction.convert_to_ls |> Abstraction.convert_to_dls
-        |> Abstraction.convert_to_nls
-        |> fun x -> [ x ]
-    | Loop _ ->
-        formula |> Abstraction.convert_to_ls |> Abstraction.convert_to_dls
-        |> Abstraction.convert_to_nls
-        |> fun x -> [ x ]
-    | _ -> [ formula ]
+    | _ when Config.Edge_abstraction.get () -> abstraction_fn formula
+    | Loop _ -> abstraction_fn formula
+    | _ -> [formula]
   in
 
   let deduplicate_states : t -> t =
