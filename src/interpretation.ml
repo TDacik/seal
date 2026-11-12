@@ -158,7 +158,7 @@ let set_value (lhs : lval) (rhs : Formula.var) (formula : Formula.t) :
   (* expr->field = expr; *)
   | Mem lhs, Field (lhs_field, NoOffset) ->
       eval_and_materialize lhs (fun (formula, lhs) ->
-          if Types.is_builtin_type lhs_field.ftype then
+          if Ast_types.is_ptr lhs_field.ftype then
             Transfer.assign_lhs_field lhs
               (Types.get_field_type lhs_field)
               rhs formula
