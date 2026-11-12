@@ -4,6 +4,7 @@ import sys
 import yaml
 import argparse
 
+from enum import StrEnum
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -36,11 +37,22 @@ def print_unknown(text):
 def print_fixed(text):
     print(f"{colors.cyan}{text}{colors.white}")
 
+class Verdict(StrEnum):
+    OK = "ok"
+    INVALID_DEREF = "invalid-deref"
+    INVALID_FREE = "invalid-free"
+    INVALID_MEMTRACK = "invalid-memtrack"
+    ASSERTION_VIOLATION = "assertion-violated"
+
+    @staticmethod
+    def error_list():
+        return [x for x in Verdict if x != Verdict.OK]
+
 @dataclass
 class TestCase:
     path: Path
-    ground_truth: str
-    expected_verdict: str | None # None denotes unknown
+    ground_truth: Verdict
+    expected_verdict: Verdict | None # None denotes that SEAL is expected to return "unknown"
 
     def __str__(self):
         return f"{self.name} (verdict: {self.ground_truth}, expected: {self.expected_verdict})"
@@ -51,13 +63,13 @@ class TestCase:
 
     @staticmethod
     def get_ground_truth(path):
-        res = []
         with open(path, "r") as f:
             for number, line in enumerate(f, start=1):
-                # TODO: distinguisg types
-                if re.search(r"//\s*bug", line, re.IGNORECASE):
-                    res.append(number)
-        return not(res)
+                for error in Verdict.error_list():
+                    if re.search(r"//\s*" + re.escape(error.value), line, re.IGNORECASE):
+                        return error
+
+        return Verdict.OK
 
     @staticmethod
     def get_expected_verdict(path):
@@ -108,13 +120,15 @@ class Runner:
     def read_verdict(self, res):
         stdout = res.stdout.strip()
         if "Invalid_free" in stdout:
-            return False
+            return Verdict.INVALID_FREE
         if "Invalid_deref" in stdout:
-            return False
+            return Verdict.INVALID_DEREF
         if "Memory_leak" in stdout:
-            return False
+            return Verdict.INVALID_MEMTRACK
+        if "Assertion violated" in stdout:
+            return Verdict.ASSERTION_VIOLATION
         if "Successful_verification" in stdout:
-            return True
+            return Verdict.OK
 
         return None
 
@@ -146,7 +160,7 @@ class Runner:
                 print_debug(res.stdout)
 
         except TimeoutExpired:
-            print_warning(f"{self.name}: timeout")
+            print_unknown(f"{test_case.name}: timeout")
 
     def run_all(self):
         for root, _, files in sorted(os.walk(BENCHMARKS)):

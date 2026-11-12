@@ -183,7 +183,7 @@ let pp_bug_type (fmt : Format.formatter) (bug_type : bug_type) =
   | Invalid_free (var, f) ->
       Format.fprintf fmt "Invalid_free: var '%a' in formula '%a'" SL.Variable.pp
         var pp_formula f
-  | Assertion_failure -> Format.fprintf fmt "Assertion failed"
+  | Assertion_failure -> Format.fprintf fmt "Assertion violated"
 
 (** Variables *)
 
