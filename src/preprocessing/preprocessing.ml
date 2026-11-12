@@ -89,7 +89,6 @@ let preprocess () =
   Visitor.visitFramacFileFunctions remove_local_init file;
   Visitor.visitFramacFileFunctions remove_not_operator file;
   Visitor.visitFramacFileFunctions remove_noop_assignments file;
-  Types.process_types file;
 
   (* this must run after adding statements *)
   Ast.mark_as_changed ();

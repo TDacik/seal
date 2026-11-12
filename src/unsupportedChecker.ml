@@ -21,5 +21,4 @@ let check_functions () =
       | _ -> ())
 
 let run () =
-  check_globals ();
   check_functions ()

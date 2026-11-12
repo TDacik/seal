@@ -170,7 +170,7 @@ let doStmt_verifier (stmt : stmt) (state : t) : t stmtaction =
   | Instr instr when Config.Svcomp_mode.get () -> (
       match instr with
       | Call (_, Var fn, _, _) ->
-          if List.mem fn.vname [ "reach_error"; "myexit"; "fail"; "exit" ] then
+          if List.mem fn.vname [ "myexit"; "fail"; "exit" ] then
             SDone
           else SDefault
       | _ -> SDefault)

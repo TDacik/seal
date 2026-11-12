@@ -15,7 +15,6 @@ exception DryRun
 let run_validation witness_path =
   Self.debug "Validating witness %a" Filepath.pretty_rel witness_path;
   let file = Ast.get () in
-  Types.process_types file;
 
   let w =
     YamlParser.parse @@ Format.asprintf "%a" Filepath.pretty_abs witness_path

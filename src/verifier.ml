@@ -10,7 +10,10 @@ module ForwardsAnalysis = Forwards (Analysis)
 let check_memcleanup main =
   let return_stmt = Kernel_function.find_return main in
   let final_state =
-    Hashtbl.find !Func_call.function_context.results return_stmt
+    try Hashtbl.find !Func_call.function_context.results return_stmt
+    with Not_found ->
+      (* Return is unreachable *)
+      []
   in
   List.iter
     (fun formula ->
@@ -27,6 +30,54 @@ let produce_correctness_witness () =
     Correctness_witness.write results path
   else ()
 
+let is_frama_c_builtin var =
+  Cil_builtins.is_builtin var
+  || Ast_attributes.(contains fc_stdlib var.vattr)
+
+let compute_initial_state () =
+  let open Cil_types in
+  let open Astral in
+  let open MemoryModel in
+  let is_var_pointer var = Ast_types.is_ptr var.vtype in
+  Globals.Vars.fold (fun var init acc ->
+    if is_var_pointer var && var.vreferenced && not @@ is_frama_c_builtin var
+    then
+      let v = GlobalInfo.varinfo_to_var var in
+      match init.init with
+      | None ->
+          Formula.Eq [v; SL.Variable.nil] :: acc
+      | Some (CInit (SingleInit exp)) ->
+          let formula', value  =
+            match Interpretation.eval acc exp with
+            | [x] -> x
+            | _ -> assert false
+          in
+          Formula.Eq [v; value] :: formula'
+      | Some (CInit (CompoundInit _)) ->
+        Config.Self.not_yet_implemented "TODO: compound init of %a" Cil_datatype.Varinfo.pretty var
+
+      | Some (StrInit _ ) -> failwith "TODO"
+
+      (*
+      let struct_def = Types.get_target_struct_def var in
+      let fields = StructDef.get_fields struct_def in
+      let target = List.map (fun f -> (Field.show f, SL.Variable.nil)) fields in
+      Formula.PointsTo (GlobalInfo.varinfo_to_var var, Generic target) :: acc*)
+    else if Ast_types.is_integral var.vtype && not @@ is_frama_c_builtin var then
+      let v = GlobalInfo.varinfo_to_var var in
+      match init.init with
+      | None -> Formula.IntEq (v, 0) :: acc
+      | Some (CInit (SingleInit exp)) ->
+          let formula', value  =
+            match Interpretation.eval acc exp with
+            | [x] -> x
+            | _ -> assert false
+          in
+          Formula.Eq [v; value] :: formula'
+      | _ -> failwith "TODO: int"
+    else acc
+  ) []
+
 let run_analysis () =
   Func_call.compute_function := ForwardsAnalysis.compute;
 
@@ -37,7 +88,9 @@ let run_analysis () =
   let first_stmt = Kernel_function.find_first_stmt main in
 
   (* set [emp] as the initial state for the analysis *)
-  Hashtbl.add !Func_call.function_context.results first_stmt [ [] ];
+  let init = compute_initial_state () in
+  Self.debug "Initial state of globals:\n  %a" Formula.pp_formula init;
+  Hashtbl.add !Func_call.function_context.results first_stmt [ init ];
 
   (* run the dataflow analysis *)
   ForwardsAnalysis.compute [ first_stmt ];

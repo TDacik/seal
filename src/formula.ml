@@ -64,6 +64,7 @@ type bug_type =
   | Invalid_memtrack of atom * t
   | Invalid_deref of var * t
   | Invalid_free of var * t
+  | Assertion_failure
 
 exception Bug of bug_type * Filepos.t
 
@@ -182,6 +183,7 @@ let pp_bug_type (fmt : Format.formatter) (bug_type : bug_type) =
   | Invalid_free (var, f) ->
       Format.fprintf fmt "Invalid_free: var '%a' in formula '%a'" SL.Variable.pp
         var pp_formula f
+  | Assertion_failure -> Format.fprintf fmt "Assertion failed"
 
 (** Variables *)
 
@@ -576,8 +578,9 @@ let split_by_reachability (vars : var list) (f : t) : t * t =
     List.fold_left split_by_reachability_from ([], f) vars
   in
 
+  let globals = get_vars f |> List.filter GlobalInfo.is_global in
   (* always include the function args and nil so that they remain in equiv classes *)
-  let reachable_vars = (nil :: vars) @ get_vars reachable_spatials in
+  let reachable_vars = (nil :: vars) @ globals @ get_vars reachable_spatials in
 
   let reachable_equiv_classes =
     rest |> get_equiv_classes

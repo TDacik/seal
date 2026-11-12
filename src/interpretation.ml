@@ -84,9 +84,17 @@ let rec eval (formula : Formula.t) (exp : exp) : (Formula.t * Formula.var) list
       in
       [ (Formula.update_ref src target formula, src) ]
   (* type cast of pointer to pointer *)
-  | CastE (typ, exp)
-    when Ast_types.is_ptr typ && Cil.typeOf exp |> Ast_types.is_ptr ->
-      eval_orig exp
+  | CastE (target_type, exp) ->
+      let current_type = Cil.typeOf exp in
+      if Ast_types.is_ptr current_type && Ast_types.is_ptr target_type then
+        eval_orig exp
+      else if Ast_types.is_integral current_type && Ast_types.is_integral target_type then
+        let target_size = Cil.bitsSizeOf target_type in
+        let current_size = Cil.bitsSizeOf current_type in
+        Config.Self.not_yet_implemented ~current:true "cast: eval_orig exp"
+      else
+        Config.Self.not_yet_implemented "cast"
+
   (* binary operator *)
   | BinOp (op, lhs, rhs, _) ->
       List.concat_map
@@ -112,7 +120,7 @@ let rec eval (formula : Formula.t) (exp : exp) : (Formula.t * Formula.var) list
   (* exp->field *)
   | Lval (Mem inner, Field (field, NoOffset)) ->
       eval_and_materialize inner (fun (formula, var) ->
-          if Types.is_relevant_type field.ftype then
+          if Types.is_builtin_type field.ftype then
             let var =
               Formula.get_spatial_target var
                 (Types.get_field_type field)
@@ -150,7 +158,7 @@ let set_value (lhs : lval) (rhs : Formula.var) (formula : Formula.t) :
   (* expr->field = expr; *)
   | Mem lhs, Field (lhs_field, NoOffset) ->
       eval_and_materialize lhs (fun (formula, lhs) ->
-          if Types.is_relevant_type lhs_field.ftype then
+          if Types.is_builtin_type lhs_field.ftype then
             Transfer.assign_lhs_field lhs
               (Types.get_field_type lhs_field)
               rhs formula
