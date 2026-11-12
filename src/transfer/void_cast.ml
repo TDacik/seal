@@ -35,19 +35,13 @@ let fresh_value target ctype =
   )
   | _ -> generic ()
 
-(** Given a formula and variable var representing a void pointer, compute the type
-    case in the assignment lhs_ctype _ := var.*)
 let apply var lhs_ctype formula =
-  if Option.for_all Ast_types.is_void_ptr lhs_ctype then formula
-  else
-    let lhs_ctype = Option.get lhs_ctype in
-    let var' = SL.Variable.mk (SL.Variable.get_name var) Sort.loc_nil in
-    let atom = Formula.get_spatial_atom_from var' formula in
-    let formula' = Formula.remove_spatial_from var' formula in
-    let new_atom = match atom with
-      (* TODO: size check *)
-      | PointsTo (_, Void (target, size)) ->
-        PointsTo (var, fresh_value target lhs_ctype)
-      | _ -> atom
-    in
-    new_atom :: formula'
+  match lhs_ctype with
+  | Some ctype when Ast_types.is_ptr ctype && not (Ast_types.is_void_ptr ctype) -> (
+    match Formula.get_spatial_atom_from_opt var formula with
+    | Some (PointsTo (_, Void (target, size))) ->
+      formula
+      |> Formula.remove_spatial_from var
+      |> Formula.add_atom (PointsTo (var, fresh_value target ctype))
+    | _ -> formula)
+  | _ -> formula
