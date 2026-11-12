@@ -1,7 +1,8 @@
-open Config
 open Cil_types
 open Common
 open Dataflow2
+
+module Self = Config.Self
 
 (** This module contains the implementation of the dataflow analysis, this
     module implements the [Dataflow2.ForwardsTransfer] interface *)
@@ -258,7 +259,7 @@ let doEdge (prev_stmt : stmt) (next_stmt : stmt) (state : t) : t =
   in
 
   let abstraction_fn formula =
-    match Config.Abstraction_mode.get () with
+    match Config.Abstraction.get () with
     | `Builtin -> [Abstraction.apply formula]
     | `Synthesis when get_iteration () >= 3 -> (
         let previous_states =

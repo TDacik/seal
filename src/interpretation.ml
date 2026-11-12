@@ -158,12 +158,14 @@ let set_value (lhs : lval) (rhs : Formula.var) (formula : Formula.t) :
   (* expr->field = expr; *)
   | Mem lhs, Field (lhs_field, NoOffset) ->
       eval_and_materialize lhs (fun (formula, lhs) ->
-          if Ast_types.is_ptr lhs_field.ftype then
-            Transfer.assign_lhs_field lhs
-              (Types.get_field_type lhs_field)
-              rhs formula
-          (* assignment into non-pointer field *)
-            else formula)
+        (* Ignore fields hidden by data abstraction *)
+        if Config.Abstraction.is_builtin () && not @@ Ast_types.is_ptr lhs_field.ftype
+        then formula
+        else
+          Transfer.assign_lhs_field lhs
+            (Types.get_field_type lhs_field)
+            rhs formula
+      )
   (* var = expr; *)
   | Var lhs, NoOffset ->
       let lhs = var lhs in

@@ -18,7 +18,7 @@ module Dump_queries = Self.False (struct
   let help = "Dump Astral queries to 'astral_queries' directory."
 end)
 
-module Abstraction_mode = struct
+module Abstraction = struct
   include Self.Enum (struct
     let option_name = "-seal-abstraction"
     let help = "TODO"

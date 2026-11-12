@@ -5,7 +5,7 @@ open Formula
 (** TODO: do not used SID directly *)
 let init ~backend ~encoding ~dump_queries () =
   GlobalSID.reset ();
-  if Config.Abstraction_mode.get () = `Builtin && not @@ Config.Validator.is_enabled () then (
+  if Config.Abstraction.is_builtin () then (
     GlobalSID.register_user_defined @@ ls ();
     GlobalSID.register_user_defined ls_two_plus;
     GlobalSID.register_user_defined @@ dls ();

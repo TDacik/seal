@@ -80,7 +80,7 @@ and get_struct_type (compinfo : compinfo) : struct_type =
 
   match (self_pointers, sll_pointers) with
   | _ when (Config.Validator.is_enabled ())
-      || not @@ Config.Abstraction_mode.is_builtin () -> Struct compinfo
+      || not @@ Config.Abstraction.is_builtin () -> Struct compinfo
   | [next_field], [] -> Sll {compinfo; next_field}
   | [top_field], [(down_field, sll_info)] -> Nl {compinfo; top_field; down_field; sll_info}
   | [next_field; prev_field], [] -> Dll {compinfo; next_field; prev_field}
@@ -92,7 +92,7 @@ let get_field_type (field : fieldinfo) : field_type =
 
   match (self_pointers, sll_pointers) with
   | _ when (Config.Validator.is_enabled ()
-      || not @@ Config.Abstraction_mode.is_builtin ()) ->
+      || not @@ Config.Abstraction.is_builtin ()) ->
         Other field.fname
   | [ next ], [] when field.forder = next.forder -> Next
   (* DLL *)
@@ -168,7 +168,7 @@ let get_type_info typ =
     match (Ast_types.unroll_deep typ).tnode with
     | TPtr { tnode = TVoid; _ } -> (default_sort, None)
     | TPtr { tnode = TComp structure; _ } ->
-        if Config.Validator.is_enabled () || not @@ Config.Abstraction_mode.is_builtin ()
+        if Config.Validator.is_enabled () || not @@ Config.Abstraction.is_builtin ()
         then default_sort, Option.some @@ c_struct_to_astral structure
         else (
           let st = get_struct_type structure in
@@ -215,7 +215,7 @@ let sort_of_type typ =
 let is_builtin_type typ =
   match (Ast_types.unroll_deep typ).tnode with
   | TPtr { tnode = TComp structure; _ } ->
-    if Config.Validator.is_enabled () || not @@ Config.Abstraction_mode.is_builtin ()
+    if Config.Validator.is_enabled () || not @@ Config.Abstraction.is_builtin ()
     then false
     else (
           let st = get_struct_type structure in
