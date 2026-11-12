@@ -175,8 +175,8 @@ let set_value (lhs : lval) (rhs : Formula.var) (formula : Formula.t) :
         | Some value ->
             Formula.substitute_by_fresh lhs formula
             |> Formula.update_int_eq lhs value
-        | _ when rhs = Formula.unknown -> formula
-        | _ when lhs = rhs -> formula
+        | _ when SL.Variable.equal rhs Formula.unknown -> formula
+        | _ when SL.Variable.equal lhs rhs -> formula
         | _ -> Transfer.assign lhs rhs formula
       in
       [ result ]

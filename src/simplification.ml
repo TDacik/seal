@@ -10,7 +10,7 @@ let reduce_equiv_classes (formula : Formula.t) : Formula.t =
 
     (* variable, to which all fresh vars will be changed *)
     let substitution_var =
-      match (List.mem Formula.nil equiv_class, program_vars, fresh_vars) with
+      match (SL.Variable.MonoList.mem Formula.nil equiv_class, program_vars, fresh_vars) with
       (* preferrably, pick nil *)
       | true, _, _ -> Formula.nil
       (* if not possible, pick a program variable *)
@@ -86,8 +86,12 @@ let convert_vars_to_fresh (vars : Formula.var list) (formula : Formula.t) :
     length bound of a single spatial atom *)
 let generalize_similar_formulas (lhs : Formula.t) (rhs : Formula.t) :
     Formula.t option =
-  let rest, first = List.partition (fun atom -> List.mem atom rhs) lhs in
-  let second = List.filter (fun atom -> not @@ List.mem atom lhs) rhs in
+  let rest, first =
+    List.partition (fun atom -> BatList.mem_cmp Formula.compare_atom atom rhs) lhs
+  in
+  let second =
+    List.filter (fun atom -> not @@ BatList.mem_cmp Formula.compare_atom atom lhs) rhs
+  in
 
   match (first, second) with
   | [ first ], [ second ] ->

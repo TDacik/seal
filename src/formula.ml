@@ -473,7 +473,7 @@ let add_eq (lhs : var) (rhs : var) (f : t) : t =
 
   match (lhs_class, rhs_class) with
   (* both variables are already in the same equiv class - do nothing *)
-  | Some lhs_class, Some rhs_class when lhs_class = rhs_class -> f
+  | Some lhs_class, Some rhs_class when SL.Variable.MonoList.equal lhs_class rhs_class -> f
   (* each variable is already in a different equiv class - merge classes *)
   | Some lhs_class, Some rhs_class when are_compatible ->
       f
@@ -563,7 +563,7 @@ let update_int_eq (var : var) (value : int) (f : t) : t =
   | _ when not @@ Config.Int_domain.get () -> f
   | Some _ ->
       List.map
-        (function IntEq (v, _) when var = v -> IntEq (v, value) | a -> a)
+        (function IntEq (v, _) when SL.Variable.equal var v -> IntEq (v, value) | a -> a)
         f
   | None -> add_atom (IntEq (var, value)) f
 

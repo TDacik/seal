@@ -320,7 +320,7 @@ let doEdge (prev_stmt : stmt) (next_stmt : stmt) (state : t) : t =
     |> Formula.canonicalize_state ~rename_fresh:false
     |> Common.list_map_pairs generalize_similar_formulas
     (* deduplicate formulas syntactically *)
-    |> List.sort_uniq compare
+    |> List.sort_uniq Formula.compare
     (* deduplicate formulas semantically *)
     |> deduplicate_states
   in
