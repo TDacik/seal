@@ -46,15 +46,18 @@ let compute_initial_state () =
       match init.init with
       | None ->
           Formula.Eq [v; SL.Variable.nil] :: acc
-      | Some (SingleInit exp) ->
+      | Some (CInit (SingleInit exp)) ->
           let formula', value  =
             match Interpretation.eval acc exp with
             | [x] -> x
             | _ -> assert false
           in
           Formula.Eq [v; value] :: formula'
-      | Some (CompoundInit _) ->
+      | Some (CInit (CompoundInit _)) ->
         Config.Self.not_yet_implemented "TODO: compound init of %a" Cil_datatype.Varinfo.pretty var
+
+      | Some (StrInit _ ) -> failwith "TODO"
+
       (*
       let struct_def = Types.get_target_struct_def var in
       let fields = StructDef.get_fields struct_def in
@@ -64,7 +67,7 @@ let compute_initial_state () =
       let v = GlobalInfo.varinfo_to_var var in
       match init.init with
       | None -> Formula.IntEq (v, 0) :: acc
-      | Some (SingleInit exp) ->
+      | Some (CInit (SingleInit exp)) ->
           let formula', value  =
             match Interpretation.eval acc exp with
             | [x] -> x
