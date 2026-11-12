@@ -418,11 +418,23 @@ let change_pto_target (src : var) (field : Types.field_type) (new_target : var)
     | Prev, DLS_t (info, next, _) -> DLS_t (info, next, new_target)
     | Top, NLS_t (info, _, next) -> NLS_t (info, new_target, next)
     | Other field, Generic vars ->
-        Generic
+        let matches = ref 0 in
+        let values =
           (List.map
              (fun ((field', _) as old) ->
-               if String.equal field field' then (field', new_target) else old)
-             vars)
+               if String.equal field field' then
+                 let _ = incr matches in
+                 (field', new_target)
+               else old)
+          vars)
+        in
+        (match !matches with
+        | 1 -> Generic values
+        | 0 -> Common.fail "Cannot find field %s among %s"
+                 field (String.concat ", " @@ List.map fst vars)
+        | _ -> Common.fail "Multiple matches of field %s among %s"
+                 field (String.concat ", " @@ List.map fst vars)
+        )
     | field, old_struct ->
         Self.abort "Field %a is not compatible with struct %a"
           Types.pp_field_type field pp_pto_target old_struct
