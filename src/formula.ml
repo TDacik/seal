@@ -630,7 +630,7 @@ let split_by_reachability (vars : var list) (f : t) : t * t =
 let count_relevant_occurences (var : var) (f : t) : int =
   f
   |> List.filter (function Distinct _ | Freed _ -> false | _ -> true)
-  |> get_vars |> Common.list_count var
+  |> get_vars |> Common.list_count SL.Variable.equal var
 
 (** Converts a formula into a canonical form by sorting variables and atoms *)
 let canonicalize ?(rename_fresh = true) (f : t) : t =

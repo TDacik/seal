@@ -38,8 +38,8 @@ let is_seal_var (var : SL.Variable.t) : bool =
 let is_anchor_var (var : SL.Variable.t) : bool =
   String.contains (SL.Variable.get_name var) '$'
 
-let list_count (elem : 'a) (list : 'a List.t) : int =
-  list |> List.filter (( = ) elem) |> List.length
+let list_count (equal : 'a -> 'a -> bool) (elem : 'a) (list : 'a List.t) : int =
+  list |> List.filter (equal elem) |> List.length
 
 (** Maps a function on each pair in list, if the function returns [Some], the
     pair of values is replaced by the returned value, otherwise the pair is left
