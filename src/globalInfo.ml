@@ -44,28 +44,31 @@ let varinfo_to_var varinfo =
     VarMap.add var varinfo;
     var
 
-let var_to_varinfo var =
+let var_base_name var =
   let name = SL.Variable.show var in
   let name =
     if String.contains name '$' then List.nth (String.split_on_char '$' name) 1
     else name
   in
-  let name =
-    if String.contains name '!' then
-      List.nth (String.split_on_char '!' name) 0
-    else name
-  in
-  try VarMap.to_varinfo name
-  with Not_found ->
-    SM.iter
-      (fun s v -> Format.printf "%s -> %a\n" s Varinfo.pretty v)
-      !VarMap.self.astral_to_c;
-    Config.Self.fatal "Cannot find varinfo corresponding to %s" name
+  if String.contains name '!' then
+    List.nth (String.split_on_char '!' name) 0
+  else name
+
+let var_to_varinfo var =
+  try VarMap.to_varinfo @@ var_base_name var
+  with Not_found -> (
+    SM.iter (fun s v -> Format.printf "%s -> %a\n" s Varinfo.pretty v) !VarMap.self.astral_to_c;
+    Config.Self.fatal "Cannot find varinfo corresponding to %s" (SL.Variable.show var))
+
+let is_varinfo var =
+  SM.mem (var_base_name var) !VarMap.self.astral_to_c
 
 let is_global var =
   if SL.Variable.is_nil var then false
   else if Common.is_seal_var var then false
-  else (var_to_varinfo var).vglob
+  else if Common.is_func_return_var var then false
+  else if is_varinfo var then (var_to_varinfo var).vglob
+  else false
 
 let find_predicate_type_by_root root =
   let varinfo = var_to_varinfo root in

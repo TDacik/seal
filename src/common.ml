@@ -29,6 +29,9 @@ let is_unknown_var (var : SL.Variable.t) : bool =
 let is_hack_var (var : SL.Variable.t) : bool =
   String.starts_with (SL.Variable.get_name var) ~prefix:"HACK"
 
+let is_func_return_var (var : SL.Variable.t) : bool =
+  String.starts_with (SL.Variable.get_name var) ~prefix:"func_return"
+
 let is_seal_var (var : SL.Variable.t) : bool =
   is_nondet_var var || is_unknown_var var || is_hack_var var
 
