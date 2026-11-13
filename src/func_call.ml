@@ -46,7 +46,7 @@ let run_function_analysis (func : Kernel_function.t) (formula : Formula.t) :
   function_context := get_default_context ();
   Hashtbl.add !function_context.results first_stmt [ formula ];
   !compute_function [ first_stmt ];
-  let result_state = Hashtbl.find !function_context.results return_stmt in
+  let result_state = Hashtbl.find_opt !function_context.results return_stmt |> Option.value ~default:[] in
 
   (* save generated states to display them later *)
   previous_results := !function_context.results :: !previous_results;

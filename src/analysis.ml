@@ -155,7 +155,7 @@ let doStmt_verifier (stmt : stmt) (state : t) : t stmtaction =
   | Loop (_, block, _, _, _) when Config.Max_loop_cycles.is_set () -> (
       match Hashtbl.find_opt loop_cycles stmt with
       | Some x when x > 0 ->
-          Hashtbl.add loop_cycles stmt (x - 1);
+          Hashtbl.replace loop_cycles stmt (x - 1);
           (* reset counters for all inner loops of the loop we are entering *)
           get_inner_loops block
           |> List.iter (fun key ->
@@ -166,7 +166,7 @@ let doStmt_verifier (stmt : stmt) (state : t) : t stmtaction =
           warning "Skipping loop cycle";
           SDone
       | None ->
-          Hashtbl.add loop_cycles stmt (Config.Max_loop_cycles.get ());
+          Hashtbl.replace loop_cycles stmt (Config.Max_loop_cycles.get ());
           SDefault)
   | Instr instr when Config.Svcomp_mode.get () -> (
       match instr with
@@ -239,7 +239,8 @@ let doStmt_validator (stmt : stmt) (orig_state : t) : t stmtaction =
   | _ -> SDefault
 
 let doStmt (stmt : stmt) (state : t) : t stmtaction =
-  if Config.Validator.is_enabled () then doStmt_validator stmt state
+  if List.is_empty state then SDone
+  else if Config.Validator.is_enabled () then doStmt_validator stmt state
   else doStmt_verifier stmt state
 
 (* Simplify and deduplicate formulas *)
