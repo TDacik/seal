@@ -93,7 +93,7 @@ class Runner:
 
     def print_version():
         cmd = [FRAMAC_BIN, "-seal-version"]
-        run(cmd)
+        exit(run(cmd))
 
     def setup(self):
         """
@@ -113,7 +113,7 @@ def parse_args():
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--sv-comp", action="store_true")
     parser.add_argument("--data-model", type=str, default="ILP32")
-    parser.add_argument("sources", nargs="+")
+    parser.add_argument("sources", nargs="*")
     return parser.parse_args()
 
 
@@ -121,6 +121,9 @@ def main():
     args = parse_args()
     runner = Runner(sv_comp_mode=args.sv_comp, debug=args.debug)
     runner.setup()
+
+    if args.version:
+        runner.print_version()
 
     exit(runner.run(args.sources))
 
