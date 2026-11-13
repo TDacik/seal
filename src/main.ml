@@ -14,6 +14,9 @@ let main () =
   else Verifier.verify ();
 
   Astral.Solver.dump_stats (Option.get !solver);
+  if not @@ Config.Validator.is_enabled () then (
+    Config.Self.result "Witness produced: %s" (Verifier.witness_status ())
+  );
   Config.Self.result "Astral queries: %d" !Astral_query.cnt;
   Config.Self.result "Astral time: %.2f" !Astral_query.solver_time
 

@@ -6,6 +6,13 @@ open Dataflow2
 module Self = Config.Self
 module ForwardsAnalysis = Forwards (Analysis)
 
+let witness_produced = ref None
+
+let witness_status () = match !witness_produced with
+  | None -> "no attempt"
+  | Some true -> "yes"
+  | Some false -> "error"
+
 (** Check if there are any allocations left after the main function *)
 let check_memcleanup main =
   let return_stmt = Kernel_function.find_return main in
@@ -24,10 +31,17 @@ let check_memcleanup main =
     final_state
 
 let produce_correctness_witness () =
-  if not @@ Config.Output_witness.is_default () then
-    let results = Invariants.get () in
-    let path = Filepath.to_string_abs @@ Config.Output_witness.get () in
-    Correctness_witness.write results path
+  if not @@ Config.Output_witness.is_default () then (
+    try
+        let results = Invariants.get () in
+        let path = Filepath.to_string_abs @@ Config.Output_witness.get () in
+        Correctness_witness.write results path;
+        witness_produced := Some true
+    with e -> (
+        witness_produced := Some false;
+        Config.Self.warning "Internal error when generating correctness witness: %s"
+          (Printexc.to_string e)
+    ))
   else ()
 
 let is_frama_c_builtin var =
@@ -115,7 +129,15 @@ let verify () =
 
       match e with
       | Formula.Bug (bug_type, pos) ->
-          if Config.Svcomp_mode.get () then Witness.write_witness bug_type pos;
+          if Config.Svcomp_mode.get () then (
+            try
+              Witness.write_witness bug_type pos;
+              witness_produced := Some true
+            with e -> (
+              witness_produced := Some false;
+              Config.Self.warning "Internal error when generating correctness witness: %s"
+                (Printexc.to_string e)
+          ));
           (* print the type of detected bug *)
           Self.result ~source:pos "%a" Formula.pp_bug_type bug_type
       | e ->
