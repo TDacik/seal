@@ -9,7 +9,7 @@ from pathlib import Path
 from subprocess import run, TimeoutExpired, PIPE, STDOUT
 
 SELF = os.path.dirname(os.path.realpath(__file__))
-SV_COMP_MODE = False
+STANDALONE_MODE = False
 
 OPAM_SYMLINK = "/tmp/_opam"
 OPAM_PATH = os.path.join(SELF, "_opam")
@@ -26,7 +26,7 @@ class Verdict(StrEnum):
 
 class Runner:
     def __init__(self, machdep, sv_comp_mode=False, debug=False):
-        self.sv_comp_mode = sv_comp_mode or SV_COMP_MODE
+        self.sv_comp_mode = sv_comp_mode
         self.debug = debug
         self.machdep = machdep
 
@@ -80,7 +80,9 @@ class Runner:
 
         return None, process.stdout
 
-    def run(self, sources):
+    def run(self, args):
+        sources = args.sources
+
         # Try verification without abstraction
         options1 = ["-seal-abstraction", "none"]
         res1, output1 = self.run_once(sources, options=options1, timeout=5)
@@ -107,7 +109,7 @@ class Runner:
         """
         We need to create symlink to _opam in /tmp to deal with absolute paths".
         """
-        if self.sv_comp_mode or SV_COMP_MODE:
+        if STANDALONE_MODE:
             if not os.path.exists(OPAM_SYMLINK):
                 try:
                     os.symlink(OPAM_PATH, OPAM_SYMLINK)
@@ -133,7 +135,7 @@ def main():
     if args.version:
         runner.print_version()
 
-    exit(runner.run(args.sources))
+    exit(runner.run(args))
 
 if __name__ == "__main__":
     main()

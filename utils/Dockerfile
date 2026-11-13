@@ -1,7 +1,7 @@
 FROM ubuntu:26.04
 
 RUN apt-get update
-RUN apt-get install -y autoconf graphviz libgmp-dev pkg-config zlib1g-dev
+RUN apt-get install -y autoconf graphviz libgmp-dev pkg-config zlib1g-dev libmpfr-dev
 RUN apt-get install -y git opam
 
 # Init opam without creating any switch
