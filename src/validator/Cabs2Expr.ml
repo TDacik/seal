@@ -57,12 +57,9 @@ let rec convert_term e =
   (* Dereference *)
   | UNARY (MEMOF, e) ->
     let e = convert_term e in
-    let field =
-      SL.Term.get_sort e
-      |> (fun sort -> HeapSort.find_target sort !heap_sort)
-      |> StructDef.get_fields
-      |> List.hd (* TODO: Check that this is indeed boxed type *)
-    in
+    let sort = SL.Term.get_sort e in
+    let name = Types.ghost_wrapper_field_name sort in
+    let field = Field.mk name sort in
     SL.Term.mk_heap_term field e
 
   | BINARY (op, _, _) -> Config.Self.fatal "binary: %a" Cabs.pp_binary_operator op
@@ -74,11 +71,7 @@ let rec convert_term e =
   | MEMBEROF _ -> failwith "memberof"
   | MEMBEROFPTR (base, field) ->
     let base = convert_term base in
-    let field =
-      SL.Term.get_sort base
-      |> (fun sort -> HeapSort.find_target sort !heap_sort)
-      |> StructDef.find_field (fun f -> (Field.show f) = field)
-    in
+    let field = Field.mk field @@ SL.Term.get_sort base in
     SL.Term.mk_heap_term field base
 
   | CALL (fn, [what; where], _) when expr_name_equal "at" fn ->

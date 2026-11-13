@@ -156,8 +156,11 @@ let c_struct_to_astral structure =
     let fields = List.map c_field_to_astral c_fields in
     MemoryModel.StructDef.mk name fields
 
+let ghost_wrapper_field_name sort =
+  Format.asprintf "%s_next" (Sort.name sort)
+
 let atomic_type_struct sort =
-  let field_name = Format.asprintf "%s_next" (Sort.name sort) in
+  let field_name = ghost_wrapper_field_name sort in
   MemoryModel.StructDef.lift_sort ~field_name sort
 
 let c_atomic_type_to_astral_struct typ =
