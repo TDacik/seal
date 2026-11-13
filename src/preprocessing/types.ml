@@ -157,10 +157,13 @@ let c_struct_to_astral structure =
     let fields = List.map c_field_to_astral c_fields in
     MemoryModel.StructDef.mk name fields
 
-let c_atomic_type_to_astral_struct typ =
-  let sort = c_type_to_astral typ in
+let atomic_type_struct sort =
   let field_name = Format.asprintf "%s_next" (Sort.name sort) in
   MemoryModel.StructDef.lift_sort ~field_name sort
+
+let c_atomic_type_to_astral_struct typ =
+  let sort = c_type_to_astral typ in
+  atomic_type_struct sort
 
 let get_type_info typ =
   let default_sort = c_type_to_astral typ in
@@ -192,11 +195,14 @@ let get_type_info typ =
   (sort, struct_def)
 
 let get_struct_def (sort : Sort.t) : MemoryModel.StructDef.t =
-  match
+  assert (not @@ Sort.is_nil sort);
+  if not @@ Sort.is_loc sort then atomic_type_struct sort
+  else match
     Seq.find (fun (s, _) -> Sort.equal sort s) @@ HT.to_seq_values type_info
   with
   | Some (_, def) -> def
-  | None -> Config.Self.abort "No structure for sort %a" Sort.pp sort
+  | None ->
+    Config.Self.abort "No structure for sort %a" Sort.pp sort
 
 let sort_of_type typ =
   if Ast_types.is_void_ptr typ then Sort.loc_nil

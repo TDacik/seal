@@ -120,7 +120,7 @@ let rec eval (formula : Formula.t) (exp : exp) : (Formula.t * Formula.var) list
   (* exp->field *)
   | Lval (Mem inner, Field (field, NoOffset)) ->
       eval_and_materialize inner (fun (formula, var) ->
-          if Types.is_builtin_type field.ftype then
+          if Types.is_builtin_type field.ftype || not @@ Config.Abstraction.is_builtin () then
             let var =
               Formula.get_spatial_target var
                 (Types.get_field_type field)
