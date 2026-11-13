@@ -23,7 +23,7 @@ let yaml_location stmt =
     ]
 
 let yaml_file_loc loc =
-  `O [("file_name", `String (Filepath.to_string_abs (Filepos.path @@ fst loc)))]
+  `A [`O [("file_name", `String (Filepath.to_string_abs (Filepos.path @@ fst loc)))]]
 
 let yaml_invariant stmt state =
   `O
@@ -51,22 +51,24 @@ let mk_predicate pred =
   let open Builtin_predicates in
   `O
     [
-      ( "predicate_definition_set",
+      ( "predicate_definition",
         `O
           [
             ("name", `String pred.name);
             ("parameters", `A (List.map yaml_params pred.params));
             ("definition", `String pred.definition);
             ("format", `String "ext_c_expression");
-            ("location", yaml_file_loc pred.origin_stmt);
+            ("locations", yaml_file_loc pred.origin_stmt);
           ] );
     ]
 
 let mk_predicates predicates = List.map mk_predicate predicates
 
 let mk_witness results =
-  let specification = "G valid-free && G valid-deref && G valid-memtrack" in
-
+  let valid_free = "CHECK( init(main()), LTL(G valid-free) ) " in
+  let valid_deref = "CHECK( init(main()), LTL(G valid-deref) ) " in
+  let valid_memtrack = "CHECK( init(main()), LTL(G valid-memtrack) )" in
+  let specification = valid_free ^ valid_deref ^ valid_memtrack in
   let data_model = get_data_model () in
   let files = get_files_with_hashes () in
 
