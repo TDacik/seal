@@ -268,21 +268,24 @@ let preprocess =
 
 let compute_substitutions_cons = function
   | LS_t (info, next) when Common.is_fresh_var next ->
-      [ (next, info.next_field) ]
+      [ (next, info.next_field.forig_name) ]
   | DLS_t (info, next, prev)
     when Common.is_fresh_var next && Common.is_fresh_var prev ->
-      [ (next, info.next_field); (prev, info.prev_field) ]
+      [ (next, info.next_field.forig_name); (prev, info.prev_field.forig_name) ]
   | DLS_t (info, next, _) when Common.is_fresh_var next ->
-      [ (next, info.next_field) ]
+      [ (next, info.next_field.forig_name) ]
   | DLS_t (info, _, prev) when Common.is_fresh_var prev ->
-      [ (prev, info.prev_field) ]
+      [ (prev, info.prev_field.forig_name) ]
   | NLS_t (info, top, next)
     when Common.is_fresh_var top && Common.is_fresh_var next ->
-      [ (next, info.sll_info.next_field); (top, info.top_field) ]
+      [ (next, info.sll_info.next_field.forig_name); (top, info.top_field.forig_name) ]
   | NLS_t (info, top, _) when Common.is_fresh_var top ->
-      [ (top, info.top_field) ]
+      [ (top, info.top_field.forig_name) ]
   | NLS_t (info, _, next) when Common.is_fresh_var next ->
-      [ (next, info.down_field) ]
+      [ (next, info.down_field.forig_name) ]
+  | Generic vals ->
+      List.filter (fun (_, v) -> Common.is_fresh_var v) vals
+      |> List.map (fun (x, y) -> (y, x))
   | _ -> []
 
 let mark_unused_params f =
@@ -301,7 +304,7 @@ let compute_substitutions f =
       | PointsTo (x, cons) ->
           compute_substitutions_cons cons
           |> List.map (fun (var, f) ->
-              (var, RichVar.convert @@ RichVar.mk_term x f.forig_name))
+              (var, RichVar.convert @@ RichVar.mk_term x f))
       | Ref (source, target) when Common.is_fresh_var target ->
           [ (target, RichVar.convert @@ RichVar.mk_ref source) ]
       | _ -> [])
