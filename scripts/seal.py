@@ -5,6 +5,7 @@ import sys
 import argparse
 
 from enum import StrEnum
+from pathlib import Path
 from subprocess import run, TimeoutExpired, PIPE, STDOUT
 
 SELF = os.path.dirname(os.path.realpath(__file__))
@@ -59,6 +60,8 @@ class Runner:
             self.machdep,
             "-seal-svcomp-mode",
             "-seal-no-catch-exceptions",
+            "-seal-witness",
+            "witness.yml",
             *sources,
             *options
         ]
@@ -84,6 +87,8 @@ class Runner:
         if res1 is not None:
             print(output1, end="")
             return
+
+        Path("witness.yml").unlink(missing_ok=True)
 
         # Try with abstraction
         res2, output2 = self.run_once(sources, result_filter=True)
