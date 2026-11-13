@@ -132,8 +132,7 @@ let rec c_type_to_astral typ =
   | TArray _ -> Common.unsupported "array type: %a" Cil_printer.pp_typ typ
   | TFun _ -> raise Skip
   | TNamed _ -> assert false
-  | TEnum _ ->
-      Config.Self.abort "Enum: %a" Cil_printer.pp_typ typ
+  | TEnum enum -> Sort.mk_bitvector @@ Cil.bitsSizeOfInt enum.ekind
   | TComp _ ->
       if Cil.isCompleteType typ
       then Config.Self.abort "Comp: %a" Cil_printer.pp_typ typ
