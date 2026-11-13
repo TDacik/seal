@@ -366,7 +366,7 @@ let convert_formula f =
   | [], pure -> String.concat " && " pure
   | [ sp ], [] -> F.sprintf "%s" sp
   | spatial, [] -> F.sprintf "\\separated(%s)" (String.concat ", " spatial)
-  | [ sp ], p -> F.sprintf "\\separated(%s) && %s" sp (String.concat " && " p)
+  | [ sp ], p -> F.sprintf "%s && %s" sp (String.concat " && " p)
   | s, p ->
       F.sprintf "\\separated(%s) && %s" (String.concat ", " s)
         (String.concat " && " p)
