@@ -9,6 +9,7 @@ RUN opam init --bare --disable-sandboxing
 RUN opam update -y
 
 WORKDIR /seal
-COPY run_build.sh ./run_build.sh
 
-ENTRYPOINT ["./run_build.sh"]
+# The build context is the repository root
+COPY . .
+ENTRYPOINT ["./utils/run_build.sh"]

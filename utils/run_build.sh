@@ -88,4 +88,4 @@ find _opam -type f -name '*.so' -exec strip --strip-unneeded {} +
 find _opam -type f -name '*.cmxs' -exec strip --strip-unneeded {} +
 strip --strip-unneeded _opam/bin/frama-c
 
-mv /tmp/_opam "$SEAL_DIR/svcomp"
+mv /tmp/_opam .
