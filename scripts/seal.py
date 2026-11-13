@@ -24,9 +24,10 @@ class Verdict(StrEnum):
     ASSERTION_VIOLATION = "assertion-violated"
 
 class Runner:
-    def __init__(self, sv_comp_mode=False, debug=False):
+    def __init__(self, machdep, sv_comp_mode=False, debug=False):
         self.sv_comp_mode = sv_comp_mode or SV_COMP_MODE
         self.debug = debug
+        self.machdep = machdep
 
         if self.sv_comp_mode:
             self.framac_path = os.path.join(SELF, "_opam/bin/frama-c")
@@ -54,6 +55,8 @@ class Runner:
         cmd = [
             self.framac_path,
             "-seal",
+            "-machdep",
+            self.machdep,
             "-seal-svcomp-mode",
             "-seal-no-catch-exceptions",
             *sources,
@@ -112,14 +115,14 @@ def parse_args():
     parser.add_argument("--version", action="store_true")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--sv-comp", action="store_true")
-    parser.add_argument("--data-model", type=str, default="ILP32")
+    parser.add_argument("-machdep", type=str, default="gcc_x86_32")
     parser.add_argument("sources", nargs="*")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    runner = Runner(sv_comp_mode=args.sv_comp, debug=args.debug)
+    runner = Runner(args.machdep, sv_comp_mode=args.sv_comp, debug=args.debug)
     runner.setup()
 
     if args.version:
