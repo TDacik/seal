@@ -22,13 +22,16 @@ let yaml_location stmt =
        "column",    `Float (Float.of_int (Filepos.column pos));*)
     ]
 
+let yaml_file_loc loc =
+  `O [("file_name", `String (Filepath.to_string_abs (Filepos.path @@ fst loc)))]
+
 let yaml_invariant stmt state =
   `O
     [
       ( "invariant",
         `O
           [
-            ("type", `String "loop_memory_invariant");
+            ("type", `String "loop_invariant");
             ("location", yaml_location stmt);
             ("value", `String (SL2C.convert_state state));
             ("format", `String "ext_c_expression");
@@ -48,14 +51,14 @@ let mk_predicate pred =
   let open Builtin_predicates in
   `O
     [
-      ( "predicate_definition",
+      ( "predicate_definition_set",
         `O
           [
             ("name", `String pred.name);
             ("parameters", `A (List.map yaml_params pred.params));
             ("definition", `String pred.definition);
             ("format", `String "ext_c_expression");
-            ("location", yaml_loc pred.origin_stmt);
+            ("location", yaml_file_loc pred.origin_stmt);
           ] );
     ]
 
@@ -87,7 +90,7 @@ let mk_witness results =
   let metadata () =
     `O
       [
-        ("format_version", `String "2.2");
+        ("format_version", `String "2.4");
         ("uuid", `String (get_uuid ()));
         ("creation_time", `String (current_time ()));
         ("producer", producer_yaml);
