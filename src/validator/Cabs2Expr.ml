@@ -50,8 +50,14 @@ let rec convert_term e =
   | VARIABLE name when String.equal name "NULL" -> SL.Term.nil
   | VARIABLE name -> convert_var name
 
-  | CONSTANT (CONST_INT  i) -> SL.Term.mk_smt @@ SMT.Bitvector.mk_const_of_int (int_of_string i) (* TODO *) 32
-  (*| CONSTANT (CONST_BOOL b) -> SL.Term.mk_smt @@ SMT.Boolean.mk_const b*)
+  | CONSTANT (CONST_INT i) ->
+    (* TODO: correct size *)
+    SL.Term.mk_smt @@ SMT.Bitvector.mk_const_of_int (int_of_string i) 32
+
+  | UNARY (MINUS, {expr_node = CONSTANT (CONST_INT i); _}) ->
+    (* TODO: correct size *)
+    SL.Term.mk_smt @@ SMT.Bitvector.mk_const_of_int (0 - int_of_string i) 32
+
   | CONSTANT _ -> failwith "unsupported constant"
 
   (* Dereference *)
