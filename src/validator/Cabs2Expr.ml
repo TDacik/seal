@@ -64,6 +64,8 @@ let rec convert_term e =
   | UNARY (MEMOF, e) ->
     let e = convert_term e in
     let sort = SL.Term.get_sort e in
+    let structure = Types.get_struct_def sort in
+    let sort = Field.get_sort @@ List.hd structure.fields in
     let name = Types.ghost_wrapper_field_name sort in
     let field = Field.mk name sort in
     SL.Term.mk_heap_term field e
@@ -77,8 +79,12 @@ let rec convert_term e =
   | MEMBEROF _ -> failwith "memberof"
   | MEMBEROFPTR (base, field) ->
     let base = convert_term base in
-    let field = Field.mk field @@ SL.Term.get_sort base in
-    SL.Term.mk_heap_term field base
+    let sort = SL.Term.get_sort base in
+    (try
+      let structure = Types.get_struct_def sort in
+      let field = StructDef.find_field (fun f -> String.equal field (Field.show f)) structure in
+      SL.Term.mk_heap_term field base
+     with Not_found -> Config.Self.fatal "Cannot find field: %s" field)
 
   | CALL (fn, [what; where], _) when expr_name_equal "at" fn ->
     if expr_name_equal "Pre" where then
@@ -96,7 +102,7 @@ let rec convert e =
     let e1 = convert_term e1 in
     let field =
       SL.Term.get_sort e1
-      |> (fun sort -> HeapSort.find_target sort !heap_sort)
+      |> Types.get_struct_def
       |> StructDef.get_fields
       |> List.hd (* TODO: Check that this is indeed boxed type *)
     in

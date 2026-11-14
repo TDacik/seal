@@ -196,15 +196,25 @@ let get_type_info typ =
   in
   (sort, struct_def)
 
-let get_struct_def (sort : Sort.t) : MemoryModel.StructDef.t =
+let get_struct_def_aux (sort : Sort.t) : MemoryModel.StructDef.t =
   assert (not @@ Sort.is_nil sort);
+  let aux sort =
+    let struct_name = String.drop_first 4 @@ Sort.name sort in
+    match Globals.Types.find_type Logic_typing.Struct struct_name with
+    | { tnode = TComp comp; _ } -> c_struct_to_astral comp
+    | ctype -> c_atomic_type_to_astral_struct ctype
+  in
   if not @@ Sort.is_loc sort then atomic_type_struct sort
-  else match
-    Seq.find (fun (s, _) -> Sort.equal sort s) @@ HT.to_seq_values type_info
-  with
-  | Some (_, def) -> def
-  | None ->
-    Config.Self.abort "No structure for sort %a" Sort.pp sort
+  else if Config.Abstraction.is_builtin () then (
+    if Sort.equal sort SL_builtins.loc_ls then SL_builtins.struct_ls
+    else if Sort.equal sort SL_builtins.loc_dls then SL_builtins.struct_dls
+    else if Sort.equal sort SL_builtins.loc_nls then SL_builtins.struct_nls
+    else aux sort)
+  else aux sort
+
+let get_struct_def sort =
+  try snd @@ Option.get @@ Seq.find (fun (s, _) -> Sort.equal sort s) @@ HT.to_seq_values type_info
+  with Not_found -> get_struct_def_aux sort
 
 let sort_of_type typ =
   if Ast_types.is_void_ptr typ then Sort.loc_nil
