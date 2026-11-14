@@ -80,12 +80,12 @@ class Runner:
 
         return None, process.stdout
 
-    def run(self, args):
+    def run_verification(self, args):
         sources = args.sources
 
         # Try verification without abstraction
         options1 = ["-seal-abstraction", "none"]
-        res1, output1 = self.run_once(sources, options=options1, timeout=5)
+        res1, output1 = self.run_once(sources, options=options1, timeout=15)
         if res1 is not None:
             print(output1, end="")
             return
@@ -100,10 +100,27 @@ class Runner:
 
         print("Inconclusive")
 
+    def run_validation(self, args):
+        cmd = [
+            self.framac_path,
+            "-seal",
+            #"-machdep",
+            #self.machdep,
+            "-seal-abstraction=none",
+            "-seal-no-memcleanup",
+            f"-seal-validate-witness={args.validate_witness}",
+            "-seal-svcomp-mode",
+            "-seal-no-catch-exceptions",
+            *args.sources,
+        ]
 
-    def print_version():
-        cmd = [FRAMAC_BIN, "-seal-version"]
-        exit(run(cmd))
+        process = run(cmd)
+        exit(process.returncode)
+
+    def print_version(self):
+        cmd = [self.framac_path, "-seal-version"]
+        res = run(cmd)
+        exit(res.returncode)
 
     def setup(self):
         """
@@ -117,11 +134,14 @@ class Runner:
                     print("Initialization of _opam symlink failed")
                     raise e
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", action="store_true")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--sv-comp", action="store_true")
+    parser.add_argument("--synthesis-abstraction", action="store_true")
+    parser.add_argument("--validate-witness", type=str, default=None)
     parser.add_argument("-machdep", type=str, default="gcc_x86_32")
     parser.add_argument("sources", nargs="*")
     return parser.parse_args()
@@ -135,7 +155,10 @@ def main():
     if args.version:
         runner.print_version()
 
-    exit(runner.run(args))
+    if args.validate_witness is not None:
+        exit(runner.run_validation(args))
+    else:
+        exit(runner.run_verification(args))
 
 if __name__ == "__main__":
     main()

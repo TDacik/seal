@@ -4,11 +4,14 @@
 
 set -euo pipefail
 
+# Root of SEAL's repository
+SEAL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 INPUT=$1
 NAME=$(basename $INPUT)
 
-time ./scripts/seal.py $INPUT
-time frama-c -seal -seal-abstraction=none -seal-svcomp-mode -seal-no-memcleanup -seal-validate-witness=witness.yml $INPUT
+time $SEAL_ROOT/scripts/seal.py $INPUT $@
+time $SEAL_ROOT/scripts/seal.py --validate-witness=witness.yml $INPUT $@
 
 # Store witness
 # TODO
