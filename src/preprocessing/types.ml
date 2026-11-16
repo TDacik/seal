@@ -226,7 +226,6 @@ let sort_of_type typ =
       | None -> sort
       | Some def ->
         let heap_sort = HeapSort.of_list [(sort, def)] in
-        Self.feedback "Updating heap sort";
         Common.solver := Some (Solver.add_heap_sort heap_sort (Option.get !Common.solver));
         sort
 

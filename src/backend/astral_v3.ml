@@ -18,12 +18,14 @@ let init ~backend ~encoding ~dump_queries () =
 
   let open SL_builtins in
   let heap_sort =
+    if Config.Abstraction.is_builtin () then
     HeapSort.of_list
       [
         (loc_ls, LS.struct_ls);
         (loc_dls, DLS.struct_dls);
         (loc_nls, NLS.struct_nls);
       ]
+    else HeapSort.empty
   in
   Solver.init ~dump_queries ~backend ~encoding ~quantifier_encoding:`Direct
     ~use_builtin_defs:false ~source:"seal" ()
