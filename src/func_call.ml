@@ -71,7 +71,13 @@ let func_call (args : Formula.var list) (func : varinfo) (formula : Formula.t)
   let return_type = Cil.getReturnType func.vtype in
   let lhs_sort =
     if Ast_types.is_void return_type then None
-    else Some (Types.sort_of_type return_type)
+    else match lhs_ctype with
+    | Some ctype
+      when Ast_types.is_void_ptr return_type
+           &&  Ast_types.is_ptr ctype
+           && not (Ast_types.is_void_ptr ctype) ->
+        Some (Types.sort_of_type ctype)
+    | _ -> Some (Types.sort_of_type return_type)
   in
   let func = Globals.Functions.get func in
   let return_stmt = Kernel_function.find_return func in
