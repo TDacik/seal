@@ -167,7 +167,27 @@ let c_atomic_type_to_astral_struct typ =
   let sort = c_type_to_astral typ in
   atomic_type_struct sort
 
-let get_type_info typ =
+let missing_fields typ def =
+  let heap_sort = Solver.get_heap_sort (Option.get !Common.solver) in
+  let missing =
+    MemoryModel.StructDef.get_fields def
+    |> List.filter (fun field ->
+           let sort = MemoryModel.Field.get_sort field in
+           Sort.is_loc sort && not (HeapSort.is_loc_sort heap_sort sort))
+  in
+  match (Ast_types.unroll_deep typ).tnode with
+  | TPtr { tnode = TComp structure; _ } ->
+      Option.get structure.cfields
+      |> List.filter (fun (cfield : fieldinfo) ->
+             List.exists
+               (fun field -> MemoryModel.Field.get_name field = cfield.fname)
+               missing)
+      |> List.map (fun (cfield : fieldinfo) -> cfield.ftype)
+  | TPtr t when not (List.is_empty missing) -> [ t ]
+  | _ -> []
+
+
+let rec get_type_info typ =
   let default_sort = c_type_to_astral typ in
   let sort, struct_def =
     match (Ast_types.unroll_deep typ).tnode with
@@ -192,7 +212,10 @@ let get_type_info typ =
       let heap_sort = HeapSort.of_list [(sort, def)] in
       Common.solver := Some (Solver.add_heap_sort heap_sort (Option.get !Common.solver));
 
-      HT.add type_info typ (sort, def)
+      HT.add type_info typ (sort, def);
+      (* Register targets of pointer fields recursively *)
+      List.iter (fun t -> ignore @@ get_type_info t) (missing_fields typ def)
+
   in
   (sort, struct_def)
 
@@ -214,7 +237,7 @@ let get_struct_def_aux (sort : Sort.t) : MemoryModel.StructDef.t =
 
 let get_struct_def sort =
   try snd @@ Option.get @@ Seq.find (fun (s, _) -> Sort.equal sort s) @@ HT.to_seq_values type_info
-  with Not_found -> get_struct_def_aux sort
+  with _ -> get_struct_def_aux sort
 
 let sort_of_type typ =
   if Ast_types.is_void_ptr typ then Sort.loc_nil

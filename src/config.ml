@@ -134,13 +134,37 @@ module Max_int_value = Self.Int (struct
       default
 end)
 
-module Check_memcleanup = Self.True (struct
+module Check_memcleanup = Self.False (struct
   let option_name = "-seal-memcleanup"
 
   let help =
     "Report memory leaks for blocks that remain reachable but are not \
      explicitly freed when program terminates."
 end)
+
+module Specification = struct
+  include Self.Enum (struct
+    let option_name = "-seal-check"
+    let help = "Property to be checked (default all supported)"
+    type t = [ `All | `MemSafety | `MemCleanup | `Assertions ]
+    let default = `All
+    let values = [
+      (`All, "all");
+      (`MemSafety, "mem-safety");
+      (`MemCleanup, "mem-cleanup");
+      (`Assertions, "assertions")
+    ]
+  end)
+
+  let check_assertions () = match get () with
+    | `All | `Assertions -> true
+    | _ -> false
+
+  let check_memcleanup () = match get () with
+    | `All | `MemCleanup -> true
+    | _ -> Check_memcleanup.get ()
+
+end
 
 module Output_witness = Self.Filepath (struct
   let option_name = "-seal-witness"
