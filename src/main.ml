@@ -4,7 +4,7 @@ open Common
 let main () =
   Printexc.record_backtrace true;
 
-  UnsupportedChecker.run ();
+  CapabilityChecker.run ();
 
   (* initialize the solver instance *)
   AstralConfig.PopperPath.set @@ Filepath.to_string_abs @@ Config.Popper_path.get ();
