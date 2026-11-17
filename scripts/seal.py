@@ -24,11 +24,46 @@ class Verdict(StrEnum):
     INVALID_MEMTRACK = "invalid-memtrack"
     ASSERTION_VIOLATION = "assertion-violated"
 
+class Property(StrEnum):
+    VALID_MEMSAFETY = "valid-memsafety"
+    VALID_MEMCLEANUP = "valid-memcleanup"
+    UNREACH_CALL = "unreach-call"
+
+    @staticmethod
+    def from_file(path):
+        name = Path(path).name
+        if name == "valid-memsafety.prp":
+            return Property.VALID_MEMSAFETY
+        if name == "valid-memcleanup.prp":
+            return Property.VALID_MEMCLEANUP
+        if name == "unreach-call.prp":
+            return Property.UNREACH_CALL
+
+        print("Unknown property file")
+        exit(1)
+
+    def to_seal_param(self):
+        if self is None:
+            return []
+        elif self == Property.VALID_MEMSAFETY:
+            prop = "mem-safety"
+        elif self == Property.VALID_MEMCLEANUP:
+            prop = "mem-cleanup"
+        elif self == Property.UNREACH_CALL:
+            prop = "assertions"
+        else:
+            assert False
+        return [f"-seal-check={prop}"]
+
 class Runner:
-    def __init__(self, machdep, sv_comp_mode=False, debug=False):
-        self.sv_comp_mode = sv_comp_mode
-        self.debug = debug
-        self.machdep = machdep
+    def __init__(self, args):
+        self.sv_comp_mode = args.sv_comp
+        self.debug = args.debug
+        self.machdep = args.machdep
+        if args.property_file:
+            self.property = Property.from_file(args.property_file)
+        else:
+            self.property = None
 
         if self.sv_comp_mode:
             self.framac_path = os.path.join(SELF, "_opam/bin/frama-c")
@@ -36,6 +71,12 @@ class Runner:
 
         # Normal mode
         self.framac_path = "frama-c"
+
+    def log_info(self):
+        if self.property:
+            print(f"Verifying property: {self.property}")
+        else:
+            print("No property specified")
 
     def read_verdict(self, output):
         if "Invalid_free" in output:
@@ -53,18 +94,19 @@ class Runner:
         return self.read_verdict(output) == Verdict.OK
 
     def run_once(self, sources, options=[], result_filter=None, timeout=None):
+        # fmt: off
         cmd = [
             self.framac_path,
             "-seal",
-            "-machdep",
-            self.machdep,
+            *self.property.to_seal_param(),
+            "-machdep", self.machdep,
             "-seal-svcomp-mode",
             "-seal-no-catch-exceptions",
-            "-seal-witness",
-            "witness.yml",
+            "-seal-witness", "witness.yml",
             *sources,
             *options
         ]
+        # fmt: on
 
         print("[SV-wrapper] Running Frama-C with command: ", " ".join(cmd))
         sys.stdout.flush()
@@ -93,10 +135,19 @@ class Runner:
         Path("witness.yml").unlink(missing_ok=True)
 
         # Try with abstraction
-        res2, output2 = self.run_once(sources, result_filter=True)
+        res2, output2 = self.run_once(sources, result_filter=True, timeout=120)
         if res2 is not None:
             print(output2, end="")
             return
+
+        # Try verification without abstraction
+        options3 = ["-seal-abstraction", "none", "-seal-max-loop-cycles", 3]
+        res3, output3 = self.run_once(sources, options=options1, timeout=30, result_filter=False)
+        if res3 is not None:
+            print(output3, end="")
+            return
+
+        Path("witness.yml").unlink(missing_ok=True)
 
         print("Inconclusive")
 
@@ -138,6 +189,7 @@ class Runner:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", action="store_true")
+    parser.add_argument("--property-file", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--sv-comp", action="store_true")
     parser.add_argument("--synthesis-abstraction", action="store_true")
@@ -149,8 +201,9 @@ def parse_args():
 
 def main():
     args = parse_args()
-    runner = Runner(args.machdep, sv_comp_mode=args.sv_comp, debug=args.debug)
+    runner = Runner(args)
     runner.setup()
+    runner.log_info()
 
     if args.version:
         runner.print_version()
