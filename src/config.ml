@@ -150,6 +150,15 @@ module Output_witness = Self.Filepath (struct
   let file_kind = "yml"
 end)
 
+module Popper_path = Self.Filepath (struct
+  let option_name = "-seal-popper-path"
+  let help = ""
+  let arg_name = "path"
+  let existence = Frama_c_kernel.Filepath.Must_exist
+  let file_kind = ""
+end)
+
+
 module Print_version = Self.False (struct
   let option_name = "-seal-version"
   let help = "Print version and exit"
