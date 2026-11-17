@@ -25,8 +25,7 @@ let check_memcleanup main =
   List.iter
     (fun formula ->
       Formula.get_spatial_atoms formula |> function
-      (* TODO: should raise Memcleanup instead *)
-      | atom :: _ -> Formula.report_bug (Invalid_memtrack (atom, formula))
+      | atom :: _ -> Formula.report_bug (Invalid_memcleanup (atom, formula))
       | _ -> ())
     final_state
 
@@ -112,7 +111,7 @@ let run_analysis () =
   Func_call.merge_all_results ();
   produce_correctness_witness ();
 
-  if Config.Check_memcleanup.get () then check_memcleanup main else ()
+  if Config.Specification.check_memcleanup () then check_memcleanup main else ()
 
 let verify () =
   (* run the analysis and catch exceptions representing bug detections *)
