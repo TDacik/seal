@@ -7,7 +7,7 @@ let main () =
   CapabilityChecker.run ();
 
   (* initialize the solver instance *)
-  AstralConfig.PopperPath.set @@ Filepath.to_string_abs @@ Config.Popper_path.get ();
+  Astral.AstralConfig.PopperPath.set @@ Filepath.to_string_abs @@ Config.Popper_path.get ();
   Astral_query.init ();
 
   if Config.Validator.is_enabled () then
