@@ -74,9 +74,9 @@ class Runner:
 
     def log_info(self):
         if self.property:
-            print(f"Verifying property: {self.property}")
+            print(f"[Seal driver] Verifying property: {self.property}")
         else:
-            print("No property specified")
+            print("[Seal driver] No property specified")
 
     def read_verdict(self, output):
         if "Invalid_free" in output:
@@ -108,7 +108,7 @@ class Runner:
         ]
         # fmt: on
 
-        print("[SV-wrapper] Running Frama-C with command: ", " ".join(cmd))
+        print("[Seal driver] Running Frama-C with command: ", " ".join(cmd))
         sys.stdout.flush()
 
         try:
@@ -135,14 +135,14 @@ class Runner:
         Path("witness.yml").unlink(missing_ok=True)
 
         # Try with abstraction
-        res2, output2 = self.run_once(sources, result_filter=True, timeout=120)
+        res2, output2 = self.run_once(sources, result_filter=True, timeout=180)
         if res2 is not None:
             print(output2, end="")
             return
 
         # Try verification without abstraction
         options3 = ["-seal-abstraction", "none", "-seal-max-loop-cycles", 3]
-        res3, output3 = self.run_once(sources, options=options1, timeout=30, result_filter=False)
+        res3, output3 = self.run_once(sources, options=options1, result_filter=False)
         if res3 is not None:
             print(output3, end="")
             return
@@ -203,10 +203,11 @@ def main():
     args = parse_args()
     runner = Runner(args)
     runner.setup()
-    runner.log_info()
 
     if args.version:
         runner.print_version()
+
+    runner.log_info()
 
     if args.validate_witness is not None:
         exit(runner.run_validation(args))
