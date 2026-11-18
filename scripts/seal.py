@@ -95,10 +95,15 @@ class Runner:
 
     def run_once(self, sources, options=[], result_filter=None, timeout=None):
         # fmt: off
+        if self.property:
+            prop = self.property.to_seal_param()
+        else:
+            prop = []
+
         cmd = [
             self.framac_path,
             "-seal",
-            *self.property.to_seal_param(),
+            *prop,
             "-machdep", self.machdep,
             "-seal-svcomp-mode",
             "-seal-no-catch-exceptions",
@@ -127,7 +132,7 @@ class Runner:
 
         # Try verification without abstraction
         options1 = ["-seal-abstraction", "none"]
-        res1, output1 = self.run_once(sources, options=options1, timeout=15)
+        res1, output1 = self.run_once(sources, options=options1, timeout=5)
         if res1 is not None:
             print(output1, end="")
             return
@@ -135,7 +140,7 @@ class Runner:
         Path("witness.yml").unlink(missing_ok=True)
 
         # Try with abstraction
-        res2, output2 = self.run_once(sources, result_filter=True, timeout=180)
+        res2, output2 = self.run_once(sources, result_filter=True, timeout=600)
         if res2 is not None:
             print(output2, end="")
             return
@@ -194,6 +199,7 @@ def parse_args():
     parser.add_argument("--sv-comp", action="store_true")
     parser.add_argument("--synthesis-abstraction", action="store_true")
     parser.add_argument("--validate-witness", type=str, default=None)
+    parser.add_argument("-seal-validate-witness", "-seal-validate-witness", type=str, default=None)
     parser.add_argument("-machdep", type=str, default="gcc_x86_32")
     parser.add_argument("sources", nargs="*")
     return parser.parse_args()

@@ -3,7 +3,10 @@
 let unsupported_functions = [
   "alloca";
   "__builtin_alloca";
-  "at_exit"
+  "at_exit";
+  "memset";
+  "memmove";
+  "memcpy";
 ]
 
 let check_function kf = match Kernel_function.get_name kf with

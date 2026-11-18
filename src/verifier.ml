@@ -111,7 +111,8 @@ let run_analysis () =
   Func_call.merge_all_results ();
   produce_correctness_witness ();
 
-  if Config.Specification.check_memcleanup () then check_memcleanup main else ()
+  if Config.Specification.check_memcleanup () && not @@ Config.Validator.is_enabled () 
+  then check_memcleanup main else ()
 
 let verify () =
   (* run the analysis and catch exceptions representing bug detections *)

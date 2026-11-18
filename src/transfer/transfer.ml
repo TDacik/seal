@@ -198,6 +198,9 @@ let call (lhs_sort : SL.Sort.t) (lhs_orig : Cil_types.lval option)
       | Formula.Bug (Invalid_deref (var, formula), pos) ->
           raise @@ Formula.Bug (Invalid_free (var, formula), pos)
       | e -> raise e)
+  | ("assert" | "__FC_assert") , _, _ when Config.Specification.check_assertions () ->
+      let pos, _ = Current_loc.get () in
+      raise @@ Formula.Bug (Assertion_failure, pos)
   | "reach_error", _, _
         when Config.(Specification.check_assertions () && Svcomp_mode.get ()) ->
       let pos, _ = Current_loc.get () in
